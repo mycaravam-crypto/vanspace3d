@@ -219,6 +219,33 @@ describe('drag lifecycle', () => {
         expect(a.position.z).toBeCloseTo(-0.5); // still allowed: no collision on this axis
     });
 
+    it('snaps onto a neighboring box\'s top face instead of the plain grid when close enough', () => {
+        const base = makeTrackedBox(0.6, 0.32, 0.4);
+        base.position.set(0, 0.16, -1.0); // top face at y = 0.32
+
+        const mover = makeTrackedBox(0.6, 0.32, 0.4);
+        mover.position.set(0, 0.5, -1.0); // same footprint, hovering a few cm above a perfect stack
+
+        fire('dragstart', mover);
+        mover.position.set(0, 0.5, -1.0); // simulate the pointer hovering here
+        fire('drag', mover);
+
+        // Perfect stack would be y = 0.32 (base top) + 0.16 (mover half-height) = 0.48,
+        // which isn't on the 5cm grid — proving this came from face-snap, not grid-snap.
+        expect(mover.position.y).toBeCloseTo(0.48);
+    });
+
+    it('falls back to grid snapping when no neighboring face is within tolerance', () => {
+        const mover = makeTrackedBox(0.3, 0.2, 0.3);
+        mover.position.set(0, 0.1, -1.0);
+        fire('dragstart', mover);
+
+        mover.position.set(0.12, 0.1, -1.0); // no neighbors at all — should just round to the grid
+        fire('drag', mover);
+
+        expect(mover.position.x).toBeCloseTo(0.10);
+    });
+
     it('allows overlapping positions when snapping/collision checking is disabled', () => {
         snapEnabled = false;
         const a = makeTrackedBox(0.3, 0.2, 0.3);

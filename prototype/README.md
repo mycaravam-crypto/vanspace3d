@@ -1,6 +1,6 @@
 # VanSpace 3D — Prototype
 
-A browser-based 3D tool for planning how cargo fits into a van. Configure the vehicle's cargo area (length, height, width, wheel-arch narrowing), drop objects into it from a library or define your own, and drag them around with collision detection and grid snapping.
+A browser-based 3D tool for planning how cargo fits into a van. Configure the vehicle's cargo area (length, height, width, wheel-arch narrowing), drop objects into it from a library or define your own, and drag them around with collision detection and face/grid snapping.
 
 Vanilla JavaScript + [Three.js](https://threejs.org/) + [Vite](https://vitejs.dev/) — no UI framework, no state-management library. See [`../PLAN.md`](../PLAN.md) for the target production architecture this prototype is de-risking, and [`../README.md`](../README.md) for how the two relate.
 
@@ -21,7 +21,7 @@ Vanilla JavaScript + [Three.js](https://threejs.org/) + [Vite](https://vitejs.de
   | Eurobox M (halb) | 40×30×32 | 5 kg |
   | Bodenplatte | 120×80×2 | 4 kg |
 - A custom object generator (width/height/depth/weight/color).
-- Drag & drop with optional 5cm grid snapping and per-axis collision rollback (an object slides along a free axis even when another axis is blocked, instead of getting stuck).
+- Drag & drop with optional snapping and per-axis collision rollback (an object slides along a free axis even when another axis is blocked, instead of getting stuck). Snapping prefers catching a neighboring object's adjacent face — stacking flush on top of it, or side-by-side — within a 4cm tolerance, and falls back to the plain 5cm grid when no neighbor is close enough.
 - 90° rotation, duplication, deletion, and locking (see keyboard shortcuts).
 
 **Weight & balance** — every object carries a weight; the total and a weighted plan-view center of gravity (with a floor marker in the 3D scene) update live as you place, move, or remove objects.
