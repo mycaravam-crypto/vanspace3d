@@ -61,7 +61,7 @@
         <div id="panel-objects" class="flex flex-col gap-4">
 
             <!-- Snapping Toggle -->
-            <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+            <label for="toggle-snap" class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
                 <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
                 <span class="text-xs font-semibold text-slate-700">Einrasten (Fl&auml;che/Raster) &amp; Kollisionen aktiv</span>
             </label>
@@ -74,33 +74,39 @@
 
             <!-- Custom Object Generator -->
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt (cm)</h2>
-                <div class="mb-3">
-                    <label class="block text-[10px] text-slate-500 font-bold mb-1">Name (optional)</label>
-                    <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                </div>
-                <div class="grid grid-cols-4 gap-2 mb-3">
-                    <div>
-                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Breite</label>
-                        <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt</h2>
+                <form id="custom-object-form" novalidate>
+                    <div class="mb-3">
+                        <label for="custom-name" class="block text-[10px] text-slate-500 font-bold mb-1">Name (optional)</label>
+                        <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                     </div>
-                    <div>
-                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Höhe</label>
-                        <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <div class="grid grid-cols-4 gap-2 mb-3">
+                        <div>
+                            <label for="custom-w" class="block text-[10px] text-slate-500 font-bold mb-1">Breite (cm)</label>
+                            <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <p id="custom-w-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                        </div>
+                        <div>
+                            <label for="custom-h" class="block text-[10px] text-slate-500 font-bold mb-1">Höhe (cm)</label>
+                            <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <p id="custom-h-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                        </div>
+                        <div>
+                            <label for="custom-d" class="block text-[10px] text-slate-500 font-bold mb-1">Tiefe (cm)</label>
+                            <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <p id="custom-d-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                        </div>
+                        <div>
+                            <label for="custom-weight" class="block text-[10px] text-slate-500 font-bold mb-1">Gewicht (kg)</label>
+                            <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                            <p id="custom-weight-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                        </div>
                     </div>
-                    <div>
-                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Tiefe</label>
-                        <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    <div class="flex space-x-2">
+                        <input type="color" id="custom-c" value="#10b981" aria-label="Farbe" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
+                        <button type="submit" id="add-custom" class="flex-1 bg-slate-800 text-white text-xs font-semibold rounded hover:bg-slate-700 shadow-sm">Generieren</button>
                     </div>
-                    <div>
-                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Gewicht</label>
-                        <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                    </div>
-                </div>
-                <div class="flex space-x-2">
-                    <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
-                    <button id="add-custom" class="flex-1 bg-slate-800 text-white text-xs font-semibold rounded hover:bg-slate-700 shadow-sm">Generieren</button>
-                </div>
+                </form>
             </div>
 
             <!-- Object list (inspector) — rendered/updated by ui.js's renderObjectList() -->
@@ -141,26 +147,26 @@
             <!-- Dimension Sliders -->
             <div class="space-y-3">
                 <div>
-                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <label for="van-len" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                         Gesamtlänge <span class="font-normal text-slate-500 font-mono"><span id="val-len">330</span>cm</span>
                     </label>
                     <input type="range" id="van-len" min="200" max="500" step="10" value="330" class="w-full accent-blue-600">
                 </div>
                 <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                    <label class="flex justify-between text-xs font-semibold text-blue-800 mb-1">
+                    <label for="van-front-len" class="flex justify-between text-xs font-semibold text-blue-800 mb-1">
                         Länge Vollbreite (Vorn) <span class="font-normal text-blue-600 font-mono"><span id="val-front-len">160</span>cm</span>
                     </label>
                     <input type="range" id="van-front-len" min="0" max="500" step="10" value="160" class="w-full accent-blue-500">
                     <p class="text-[9px] text-blue-600/80 mt-1 uppercase font-bold tracking-wider">Bereich ohne Radkästen</p>
                 </div>
                 <div>
-                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <label for="van-height" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                         Gesamthöhe <span class="font-normal text-slate-500 font-mono"><span id="val-height">190</span>cm</span>
                     </label>
                     <input type="range" id="van-height" min="120" max="250" step="10" value="190" class="w-full accent-blue-600">
                 </div>
                 <div>
-                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <label for="van-width-max" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                         Breite (Maximal) <span class="font-normal text-slate-500 font-mono"><span id="val-width-max">180</span>cm</span>
                     </label>
                     <input type="range" id="van-width-max" min="140" max="240" step="5" value="180" class="w-full accent-blue-600">
@@ -171,13 +177,13 @@
             <div class="pt-3 border-t border-slate-200 space-y-3">
                 <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Radkästen & Verengung</h2>
                 <div>
-                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <label for="van-width-min" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                         Breite Unten <span class="font-normal text-slate-500 font-mono"><span id="val-width-min">130</span>cm</span>
                     </label>
                     <input type="range" id="van-width-min" min="80" max="160" step="5" value="130" class="w-full accent-emerald-500">
                 </div>
                 <div>
-                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                    <label for="van-arch-h" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                         Höhe Radkästen <span class="font-normal text-slate-500 font-mono"><span id="val-arch-h">45</span>cm</span>
                     </label>
                     <input type="range" id="van-arch-h" min="10" max="80" step="5" value="45" class="w-full accent-emerald-500">
@@ -186,7 +192,7 @@
 
             <!-- Payload limit -->
             <div class="pt-3 border-t border-slate-200">
-                <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                <label for="van-payload" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
                     Max. Zuladung <span class="font-normal text-slate-500 font-mono"><span id="val-payload">400</span>kg</span>
                 </label>
                 <input type="range" id="van-payload" min="50" max="2000" step="10" value="400" class="w-full accent-amber-600">
