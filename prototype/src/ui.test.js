@@ -1,0 +1,420 @@
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+
+vi.mock('./van.js', () => ({ buildVanGeometry: vi.fn() }));
+vi.mock('./objects.js', () => ({
+    addBox: vi.fn(() => ({})),
+    clearAllObjects: vi.fn(),
+    clearUnlockedObjects: vi.fn(),
+    DEFAULT_WEIGHT: 5,
+}));
+vi.mock('./persistence.js', () => ({
+    saveConfig: vi.fn(() => true),
+    loadConfig: vi.fn(() => false),
+    hasSavedConfig: vi.fn(() => false),
+    clearSavedConfig: vi.fn(),
+    exportToFile: vi.fn(),
+    importFromText: vi.fn(() => true),
+}));
+vi.mock('./history.js', () => ({
+    captureUndoPoint: vi.fn(),
+    undo: vi.fn(() => false),
+    redo: vi.fn(() => false),
+    canUndo: vi.fn(() => false),
+    canRedo: vi.fn(() => false),
+}));
+
+const { vanState, DEFAULT_VAN_STATE } = await import('./state.js');
+const { buildVanGeometry } = await import('./van.js');
+const { addBox, clearAllObjects, clearUnlockedObjects } = await import('./objects.js');
+const {
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
+} = await import('./persistence.js');
+const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
+const { STANDARD_LIBRARY } = await import('./library.js');
+const { initUI, isSnapEnabled, refreshHistoryButtons } = await import('./ui.js');
+
+// Minimal DOM fixture mirroring the ids/attributes ui.js reads/writes.
+// Not the full Tailwind markup — just the seams this module touches.
+function mountFixture() {
+    document.body.innerHTML = `
+        <input type="checkbox" id="toggle-snap" checked>
+
+        <button id="tab-objects" class="tab-btn active flex-1 py-2 text-sm font-semibold"></button>
+        <button id="tab-config" class="tab-btn inactive flex-1 py-2 text-sm font-semibold"></button>
+        <div id="panel-objects" class="flex"></div>
+        <div id="panel-config" class="hidden"></div>
+
+        <div id="standard-library-list"></div>
+
+        <input id="custom-w" value="50">
+        <input id="custom-h" value="40">
+        <input id="custom-d" value="80">
+        <input id="custom-weight" value="5">
+        <input id="custom-c" value="#10b981">
+        <button id="add-custom"></button>
+
+        <span id="obj-count"></span>
+        <span id="total-weight"></span>
+        <span id="cog-info"></span>
+        <button id="clear-all"></button>
+
+        <input type="range" id="van-len" value="3.3">
+        <input type="range" id="van-front-len" value="1.6">
+        <input type="range" id="van-height" value="1.9">
+        <input type="range" id="van-width-max" value="1.8">
+        <input type="range" id="van-width-min" value="1.3">
+        <input type="range" id="van-arch-h" value="0.45">
+        <span id="val-len"></span>
+        <span id="val-front-len"></span>
+        <span id="val-height"></span>
+        <span id="val-width-max"></span>
+        <span id="val-width-min"></span>
+        <span id="val-arch-h"></span>
+
+        <button id="undo-btn"></button>
+        <button id="redo-btn"></button>
+
+        <button id="save-config"></button>
+        <button id="load-config"></button>
+        <button id="reset-config"></button>
+        <button id="export-config"></button>
+        <input type="file" id="import-config-file">
+        <p id="persistence-status"></p>
+    `;
+}
+
+beforeEach(() => {
+    Object.assign(vanState, DEFAULT_VAN_STATE);
+    mountFixture();
+    buildVanGeometry.mockClear();
+    addBox.mockClear();
+    clearAllObjects.mockClear();
+    clearUnlockedObjects.mockClear();
+    saveConfig.mockClear();
+    saveConfig.mockReturnValue(true);
+    loadConfig.mockClear();
+    loadConfig.mockReturnValue(false); // default: nothing saved, so initUI() builds from defaults
+    hasSavedConfig.mockClear();
+    hasSavedConfig.mockReturnValue(false);
+    clearSavedConfig.mockClear();
+    exportToFile.mockClear();
+    importFromText.mockClear();
+    importFromText.mockReturnValue(true);
+    captureUndoPoint.mockClear();
+    canUndo.mockClear();
+    canUndo.mockReturnValue(false);
+    canRedo.mockClear();
+    canRedo.mockReturnValue(false);
+    initUI();
+});
+
+describe('isSnapEnabled', () => {
+    it('reflects the checkbox state', () => {
+        expect(isSnapEnabled()).toBe(true);
+        document.getElementById('toggle-snap').checked = false;
+        expect(isSnapEnabled()).toBe(false);
+    });
+});
+
+describe('tab switching', () => {
+    it('switches to the config panel and back', () => {
+        document.getElementById('tab-config').click();
+        expect(document.getElementById('panel-config').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('panel-objects').classList.contains('hidden')).toBe(true);
+        expect(document.getElementById('tab-config').className).toContain('active');
+
+        document.getElementById('tab-objects').click();
+        expect(document.getElementById('panel-objects').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('panel-config').classList.contains('hidden')).toBe(true);
+        expect(document.getElementById('tab-objects').className).toContain('active');
+    });
+});
+
+describe('config sliders', () => {
+    it('updates vanState and the label text on input', () => {
+        const slider = document.getElementById('van-height');
+        slider.value = '2.1';
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.maxHeight).toBe(2.1);
+        expect(document.getElementById('val-height').textContent).toBe('2.10');
+        expect(buildVanGeometry).toHaveBeenCalled();
+    });
+
+    it('clamps frontLength to the total length and writes the clamped value back to the slider', () => {
+        document.getElementById('van-len').value = '2.5';
+        document.getElementById('van-len').dispatchEvent(new Event('input', { bubbles: true }));
+
+        document.getElementById('van-front-len').value = '4.0'; // more than the 2.5m total
+        document.getElementById('van-front-len').dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.frontLength).toBe(2.5);
+        expect(document.getElementById('van-front-len').value).toBe('2.5');
+    });
+
+    it('clamps narrowWidth to maxWidth', () => {
+        document.getElementById('van-width-max').value = '1.5';
+        document.getElementById('van-width-max').dispatchEvent(new Event('input', { bubbles: true }));
+
+        document.getElementById('van-width-min').value = '1.7'; // more than the 1.5m max width
+        document.getElementById('van-width-min').dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.narrowWidth).toBe(1.5);
+    });
+
+    it('leaves narrowWidth untouched when it is already within maxWidth', () => {
+        document.getElementById('van-width-min').value = '1.1';
+        document.getElementById('van-width-min').dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.narrowWidth).toBe(1.1);
+    });
+
+    it('clamps archHeight to maxHeight - 0.1 when the arch slider exceeds the new headroom', () => {
+        document.getElementById('van-arch-h').value = '0.8'; // its own slider max
+        document.getElementById('van-height').value = '0.85'; // leaves only 0.75m of headroom
+        document.getElementById('van-height').dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.archHeight).toBeCloseTo(0.75); // 0.85 - 0.1
+        expect(document.getElementById('val-arch-h').textContent).toBe('0.75');
+    });
+
+    it('leaves archHeight untouched when there is enough clearance', () => {
+        document.getElementById('van-height').value = '2.4';
+        document.getElementById('van-height').dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.archHeight).toBe(0.45);
+    });
+
+    it('captures an undo point on pointerdown, before the drag gesture changes anything', () => {
+        captureUndoPoint.mockClear();
+        document.getElementById('van-height').dispatchEvent(new Event('pointerdown', { bubbles: true }));
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('standard library rendering', () => {
+    it('renders one button per library entry', () => {
+        const buttons = document.querySelectorAll('#standard-library-list button');
+        expect(buttons).toHaveLength(STANDARD_LIBRARY.length);
+    });
+
+    it('calls addBox with the exact dimensions/color/weight for every library entry', () => {
+        STANDARD_LIBRARY.forEach((item) => {
+            addBox.mockClear();
+            document.querySelector(`#standard-library-list button[data-lib-id="${item.id}"]`).click();
+            expect(addBox).toHaveBeenCalledWith(item.w, item.h, item.d, item.color, item.weight);
+        });
+    });
+
+    it('captures an undo point before adding a library object', () => {
+        captureUndoPoint.mockClear();
+        document.querySelector(`#standard-library-list button[data-lib-id="${STANDARD_LIBRARY[0].id}"]`).click();
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+    });
+
+    it('shows the dimensions in the button label as WxDxH centimeters', () => {
+        const first = STANDARD_LIBRARY[0];
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
+        expect(btn.textContent).toContain(`${Math.round(first.w * 100)}x${Math.round(first.d * 100)}x${Math.round(first.h * 100)}`);
+    });
+});
+
+describe('object panel buttons', () => {
+    it('adds a custom object converted from cm to meters, with the given weight', () => {
+        document.getElementById('add-custom').click();
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5);
+    });
+
+    it('falls back to the default weight for an invalid custom weight', () => {
+        document.getElementById('custom-weight').value = '-3';
+        document.getElementById('add-custom').click();
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5); // DEFAULT_WEIGHT mock = 5
+    });
+
+    it('passes the exact color picker value through to addBox unmodified', () => {
+        document.getElementById('custom-c').value = '#ff00aa';
+        document.getElementById('add-custom').click();
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#ff00aa', 5);
+    });
+
+    it('rejects an empty/non-numeric custom dimension without calling addBox', () => {
+        document.getElementById('custom-h').value = '';
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+        document.getElementById('add-custom').click();
+
+        expect(addBox).not.toHaveBeenCalled();
+        expect(alertSpy).toHaveBeenCalled();
+    });
+
+    it('rejects non-positive custom dimensions without calling addBox', () => {
+        document.getElementById('custom-w').value = '-5';
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+        document.getElementById('add-custom').click();
+
+        expect(addBox).not.toHaveBeenCalled();
+        expect(alertSpy).toHaveBeenCalled();
+    });
+
+    it('rejects absurdly large custom dimensions without calling addBox', () => {
+        document.getElementById('custom-w').value = '5000';
+        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
+
+        document.getElementById('add-custom').click();
+
+        expect(addBox).not.toHaveBeenCalled();
+        expect(alertSpy).toHaveBeenCalled();
+    });
+
+    it('clears unlocked objects (sparing locked ones) and captures an undo point first', () => {
+        document.getElementById('clear-all').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(clearUnlockedObjects).toHaveBeenCalled();
+        expect(clearAllObjects).not.toHaveBeenCalled();
+    });
+});
+
+describe('undo/redo buttons', () => {
+    it('starts with both buttons disabled (fresh history)', () => {
+        expect(document.getElementById('undo-btn').disabled).toBe(true);
+        expect(document.getElementById('redo-btn').disabled).toBe(true);
+    });
+
+    it('enables a button once its history mock reports availability', () => {
+        canUndo.mockReturnValue(true);
+        refreshHistoryButtons();
+        expect(document.getElementById('undo-btn').disabled).toBe(false);
+        expect(document.getElementById('redo-btn').disabled).toBe(true);
+    });
+
+    it('undo button click calls undo() and re-syncs sliders on success', async () => {
+        const { undo } = await import('./history.js');
+        undo.mockReturnValue(true);
+        canUndo.mockReturnValue(true);
+        refreshHistoryButtons(); // enable the button, matching what a real capture would do
+        vanState.maxHeight = 2.2;
+
+        document.getElementById('undo-btn').click();
+
+        expect(undo).toHaveBeenCalled();
+        expect(document.getElementById('van-height').value).toBe('2.2');
+    });
+
+    it('redo button click calls redo()', async () => {
+        const { redo } = await import('./history.js');
+        redo.mockReturnValue(true);
+        canRedo.mockReturnValue(true);
+        refreshHistoryButtons();
+
+        document.getElementById('redo-btn').click();
+
+        expect(redo).toHaveBeenCalled();
+    });
+});
+
+describe('project persistence', () => {
+    it('auto-loads a saved project on init instead of building defaults', () => {
+        loadConfig.mockReturnValue(true);
+        buildVanGeometry.mockClear();
+
+        initUI(); // re-init to exercise the loadConfig()-succeeds branch
+
+        expect(buildVanGeometry).not.toHaveBeenCalled(); // loadConfig() already rebuilds internally
+    });
+
+    it('builds from defaults on init when nothing was saved', () => {
+        // loadConfig already mocked to return false in beforeEach
+        expect(buildVanGeometry).toHaveBeenCalled();
+    });
+
+    it('does not add an undo point for the initial auto-load on page boot', () => {
+        // captureUndoPoint was already cleared post-init by earlier tests'
+        // beforeEach ordering; check directly against a fresh init.
+        captureUndoPoint.mockClear();
+        loadConfig.mockReturnValue(true);
+        initUI();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+    });
+
+    it('saves on click and shows a success status', () => {
+        document.getElementById('save-config').click();
+        expect(saveConfig).toHaveBeenCalled();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/gespeichert/i);
+    });
+
+    it('shows a failure status when saving fails', () => {
+        saveConfig.mockReturnValueOnce(false);
+        document.getElementById('save-config').click();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/fehlgeschlagen/i);
+    });
+
+    it('loads, captures an undo point first, and re-syncs the sliders when a saved config exists', () => {
+        hasSavedConfig.mockReturnValue(true);
+        loadConfig.mockReturnValue(true);
+        vanState.maxHeight = 2.2; // simulate loadConfig() having changed vanState
+
+        document.getElementById('load-config').click();
+
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(loadConfig).toHaveBeenCalled();
+        expect(document.getElementById('van-height').value).toBe('2.2');
+        expect(document.getElementById('val-height').textContent).toBe('2.20');
+    });
+
+    it('shows a "nothing saved" status and skips the undo capture when there is nothing to load', () => {
+        // hasSavedConfig mocked to false in beforeEach; clear the call that
+        // initUI()'s own auto-load-on-boot already made to loadConfig().
+        loadConfig.mockClear();
+        document.getElementById('load-config').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(loadConfig).not.toHaveBeenCalled();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/kein/i);
+    });
+
+    it('clears storage, wipes objects, and restores default vanState on reset', () => {
+        vanState.length = 4.9;
+        document.getElementById('reset-config').click();
+
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(clearSavedConfig).toHaveBeenCalled();
+        expect(clearAllObjects).toHaveBeenCalled();
+        expect(vanState.length).toBe(DEFAULT_VAN_STATE.length);
+        expect(document.getElementById('van-len').value).toBe(String(DEFAULT_VAN_STATE.length));
+        expect(buildVanGeometry).toHaveBeenCalled();
+    });
+
+    it('exports on click', () => {
+        document.getElementById('export-config').click();
+        expect(exportToFile).toHaveBeenCalled();
+    });
+
+    it('imports the selected file, captures an undo point, and re-syncs on success', async () => {
+        loadConfig.mockReturnValue(false); // keep init simple; irrelevant here
+        vanState.maxHeight = 2.4;
+
+        const file = new File(['{"version":1,"vanState":{},"objects":[]}'], 'project.json', { type: 'application/json' });
+        const input = document.getElementById('import-config-file');
+        Object.defineProperty(input, 'files', { value: [file], configurable: true });
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await vi.waitFor(() => expect(importFromText).toHaveBeenCalled());
+
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/importiert/i);
+        expect(input.value).toBe(''); // cleared so re-selecting the same file re-fires 'change'
+    });
+
+    it('shows a failure status when the imported file is invalid', async () => {
+        importFromText.mockReturnValue(false);
+
+        const file = new File(['not json'], 'bad.json', { type: 'application/json' });
+        const input = document.getElementById('import-config-file');
+        Object.defineProperty(input, 'files', { value: [file], configurable: true });
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        await vi.waitFor(() => expect(importFromText).toHaveBeenCalled());
+
+        expect(document.getElementById('persistence-status').textContent).toMatch(/fehlgeschlagen/i);
+    });
+});

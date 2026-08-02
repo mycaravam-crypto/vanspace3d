@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VanSpace 3D - Optimized Prototype</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0f172a; user-select: none; font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for a cleaner look */
+        #ui-container::-webkit-scrollbar { width: 4px; }
+        #ui-container::-webkit-scrollbar-track { background: transparent; }
+        #ui-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+        
+        .tab-btn { transition: all 0.2s ease; }
+        .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        .tab-btn.inactive { color: #64748b; border-bottom: 2px solid transparent; }
+        .tab-btn.inactive:hover { color: #334155; }
+        
+        input[type="range"] { cursor: pointer; }
+        input[type="number"] { transition: border-color 0.2s; }
+        button { transition: all 0.2s ease; cursor: pointer; }
+    </style>
+    <!-- 3D Library Imports -->
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+</head>
+<body class="antialiased text-gray-800">
+    <!-- UI Overlay -->
+    <div id="ui-container" class="absolute top-4 left-4 bg-white/95 backdrop-blur p-5 rounded-xl shadow-2xl w-80 max-h-[95vh] overflow-y-auto border border-gray-200 z-10 flex flex-col gap-4">
+        
+        <!-- Header -->
+        <div>
+            <h1 class="text-xl font-bold text-gray-900 tracking-tight">VanSpace 3D</h1>
+            <p class="text-xs text-gray-500 font-medium">Optimized Prototype v6</p>
+        </div>
+        
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200">
+            <button id="tab-objects" class="tab-btn active flex-1 py-2 text-sm font-semibold">Objekte</button>
+            <button id="tab-config" class="tab-btn inactive flex-1 py-2 text-sm font-semibold">Laderaum</button>
+        </div>
+
+        <!-- PANEL: OBJECTS -->
+        <div id="panel-objects" class="flex flex-col gap-4">
+            
+            <!-- Snapping Toggle -->
+            <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
+                <span class="text-xs font-semibold text-slate-700">5cm Raster & Kollisionen aktiv</span>
+            </label>
+
+            <!-- Standard Objects -->
+            <div>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Standard-Bibliothek</h2>
+                <div class="grid grid-cols-1 gap-2">
+                    <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-blue-500 group" id="add-eb-medium">
+                        <span class="text-sm font-medium text-slate-700 group-hover:text-blue-600">Eurobox M</span>
+                        <span class="text-[11px] text-slate-400 font-mono">60x40x32</span>
+                    </button>
+                    <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-amber-500 group" id="add-wood-small">
+                        <span class="text-sm font-medium text-slate-700 group-hover:text-amber-600">Bodenplatte</span>
+                        <span class="text-[11px] text-slate-400 font-mono">120x80x2</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Custom Object Generator -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt (cm)</h2>
+                <div class="grid grid-cols-3 gap-2 mb-3">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Breite</label>
+                        <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Höhe</label>
+                        <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Tiefe</label>
+                        <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
+                    <button id="add-custom" class="flex-1 bg-slate-800 text-white text-xs font-semibold rounded hover:bg-slate-700 shadow-sm">Generieren</button>
+                </div>
+            </div>
+            
+            <!-- Stats & Clear -->
+            <div class="flex flex-col gap-2 pt-2 border-t border-slate-200">
+                <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+                    <span>Plazierte Objekte:</span> 
+                    <span id="obj-count" class="bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full text-xs">0</span>
+                </div>
+                <button id="clear-all" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 text-sm font-semibold">Alle entfernen</button>
+            </div>
+        </div>
+
+        <!-- PANEL: CONFIGURATION -->
+        <div id="panel-config" class="hidden flex-col gap-4">
+            
+            <!-- Dimension Sliders -->
+            <div class="space-y-3">
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Gesamtlänge <span class="font-normal text-slate-500 font-mono"><span id="val-len">3.3</span>m</span>
+                    </label>
+                    <input type="range" id="van-len" min="2.0" max="5.0" step="0.1" value="3.3" class="w-full accent-blue-600">
+                </div>
+                <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                    <label class="flex justify-between text-xs font-semibold text-blue-800 mb-1">
+                        Länge Vollbreite (Vorn) <span class="font-normal text-blue-600 font-mono"><span id="val-front-len">1.6</span>m</span>
+                    </label>
+                    <input type="range" id="van-front-len" min="0.0" max="5.0" step="0.1" value="1.6" class="w-full accent-blue-500">
+                    <p class="text-[9px] text-blue-600/80 mt-1 uppercase font-bold tracking-wider">Bereich ohne Radkästen</p>
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Gesamthöhe <span class="font-normal text-slate-500 font-mono"><span id="val-height">1.9</span>m</span>
+                    </label>
+                    <input type="range" id="van-height" min="1.2" max="2.5" step="0.1" value="1.9" class="w-full accent-blue-600">
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Breite (Maximal) <span class="font-normal text-slate-500 font-mono"><span id="val-width-max">1.8</span>m</span>
+                    </label>
+                    <input type="range" id="van-width-max" min="1.4" max="2.4" step="0.05" value="1.8" class="w-full accent-blue-600">
+                </div>
+            </div>
+
+            <!-- Radkästen Sliders -->
+            <div class="pt-3 border-t border-slate-200 space-y-3">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Radkästen & Verengung</h2>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Breite Unten <span class="font-normal text-slate-500 font-mono"><span id="val-width-min">1.3</span>m</span>
+                    </label>
+                    <input type="range" id="van-width-min" min="0.8" max="1.6" step="0.05" value="1.3" class="w-full accent-emerald-500">
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Höhe Radkästen <span class="font-normal text-slate-500 font-mono"><span id="val-arch-h">0.45</span>m</span>
+                    </label>
+                    <input type="range" id="van-arch-h" min="0.1" max="0.8" step="0.05" value="0.45" class="w-full accent-emerald-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- Instructions / Helpers -->
+        <div class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed shadow-inner">
+            <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
+            <p><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { DragControls } from 'three/addons/controls/DragControls.js';
+
+        // ==========================================
+        // 1. UI LOGIC (Tabs)
+        // ==========================================
+        const tabObjects = document.getElementById('tab-objects');
+        const tabConfig = document.getElementById('tab-config');
+        const panelObjects = document.getElementById('panel-objects');
+        const panelConfig = document.getElementById('panel-config');
+
+        function switchTab(activeTab, inactiveTab, activePanel, inactivePanel) {
+            activePanel.classList.remove('hidden');
+            activePanel.classList.add('flex');
+            inactivePanel.classList.add('hidden');
+            inactivePanel.classList.remove('flex');
+            
+            activeTab.className = "tab-btn active flex-1 py-2 text-sm font-semibold";
+            inactiveTab.className = "tab-btn inactive flex-1 py-2 text-sm font-semibold";
+        }
+
+        tabObjects.addEventListener('click', () => switchTab(tabObjects, tabConfig, panelObjects, panelConfig));
+        tabConfig.addEventListener('click', () => switchTab(tabConfig, tabObjects, panelConfig, panelObjects));
+
+        // ==========================================
+        // 2. SCENE SETUP (Three.js)
+        // ==========================================
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0f172a); 
+        scene.fog = new THREE.Fog(0x0f172a, 10, 40);
+        
+        const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+        camera.position.set(6, 6, 8);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Performance optimization
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.65);
+        scene.add(ambientLight);
+        
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        dirLight.position.set(10, 15, 10);
+        dirLight.castShadow = true;
+        dirLight.shadow.mapSize.width = 2048;
+        dirLight.shadow.mapSize.height = 2048;
+        dirLight.shadow.camera.near = 0.5;
+        dirLight.shadow.camera.far = 50;
+        dirLight.shadow.camera.left = -10;
+        dirLight.shadow.camera.right = 10;
+        dirLight.shadow.camera.top = 10;
+        dirLight.shadow.camera.bottom = -10;
+        dirLight.shadow.bias = -0.0005; // Prevent shadow acne
+        scene.add(dirLight);
+
+        // Environment Details
+        const gridHelper = new THREE.GridHelper(20, 40, 0x334155, 0x1e293b); 
+        gridHelper.position.y = -0.01; 
+        scene.add(gridHelper);
+
+        const floorGeo = new THREE.PlaneGeometry(30, 30);
+        const floorMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.8 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+
+        // ==========================================
+        // 3. VAN CONFIGURATION & GEOMETRY
+        // ==========================================
+        let vanState = {
+            length: 3.3, frontLength: 1.6, maxHeight: 1.9, maxWidth: 1.8, narrowWidth: 1.3, archHeight: 0.45
+        };
+
+        let vanGroup = new THREE.Group();
+        scene.add(vanGroup);
+        const objects = [];
+
+        // Safe disposal to prevent memory leaks
+        function disposeGroup(group) {
+            const children = [...group.children];
+            for (let child of children) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) child.material.forEach(m => m.dispose());
+                    else child.material.dispose();
+                }
+                if (child.children.length > 0) disposeGroup(child);
+                group.remove(child);
+            }
+        }
+
+        // Reusable function for transparent bounding boxes
+        function createVanZone(w, h, l, yPos, colorHex) {
+            const geo = new THREE.BoxGeometry(w, h, l);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: colorHex, transparent: true, opacity: 0.08,
+                side: THREE.DoubleSide, depthWrite: false
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.y = yPos;
+            
+            const edges = new THREE.EdgesGeometry(geo);
+            const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ 
+                color: colorHex, linewidth: 2, transparent: true, opacity: 0.4
+            }));
+            mesh.add(line);
+            return mesh;
+        }
+
+        function buildVanGeometry() {
+            disposeGroup(vanGroup);
+            
+            const zFrontStart = -vanState.length / 2;
+            const zSplit = zFrontStart + vanState.frontLength;
+            const rearLength = Math.max(0, vanState.length - vanState.frontLength);
+            
+            const zFrontCenter = zFrontStart + (vanState.frontLength / 2);
+            const zRearCenter = zSplit + (rearLength / 2);
+
+            const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
+
+            // Front Area (Full Width)
+            if (vanState.frontLength > 0.01) {
+                const frontBox = createVanZone(vanState.maxWidth, vanState.maxHeight, vanState.frontLength, vanState.maxHeight/2, 0x3b82f6);
+                frontBox.position.z = zFrontCenter;
+                vanGroup.add(frontBox);
+                
+                const frontFloor = new THREE.Mesh(new THREE.PlaneGeometry(vanState.maxWidth, vanState.frontLength), floorMat);
+                frontFloor.rotation.x = -Math.PI / 2;
+                frontFloor.position.set(0, 0.01, zFrontCenter);
+                frontFloor.receiveShadow = true;
+                vanGroup.add(frontFloor);
+            }
+
+            // Rear Area (Narrow bottom, wide top)
+            if (rearLength > 0.01) {
+                // Lower narrow area
+                const rearLower = createVanZone(vanState.narrowWidth, vanState.archHeight, rearLength, vanState.archHeight/2, 0x10b981);
+                rearLower.position.z = zRearCenter;
+                vanGroup.add(rearLower);
+
+                // Upper wide area
+                const upperHeight = Math.max(0.01, vanState.maxHeight - vanState.archHeight);
+                const rearUpper = createVanZone(vanState.maxWidth, upperHeight, rearLength, vanState.archHeight + upperHeight/2, 0x3b82f6);
+                rearUpper.position.z = zRearCenter;
+                vanGroup.add(rearUpper);
+
+                // Rear floor
+                const rearFloor = new THREE.Mesh(new THREE.PlaneGeometry(vanState.narrowWidth, rearLength), floorMat);
+                rearFloor.rotation.x = -Math.PI / 2;
+                rearFloor.position.set(0, 0.01, zRearCenter);
+                rearFloor.receiveShadow = true;
+                vanGroup.add(rearFloor);
+
+                // Wheel arch solid representation
+                const archWidth = Math.max(0, (vanState.maxWidth - vanState.narrowWidth) / 2);
+                if (archWidth > 0.01) {
+                    const archGeo = new THREE.BoxGeometry(archWidth, vanState.archHeight, rearLength);
+                    const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+                    
+                    const leftArch = new THREE.Mesh(archGeo, archMat);
+                    leftArch.position.set(-vanState.narrowWidth/2 - archWidth/2, vanState.archHeight/2, zRearCenter);
+                    leftArch.receiveShadow = true; leftArch.castShadow = true;
+                    vanGroup.add(leftArch);
+
+                    const rightArch = new THREE.Mesh(archGeo, archMat);
+                    rightArch.position.set(vanState.narrowWidth/2 + archWidth/2, vanState.archHeight/2, zRearCenter);
+                    rightArch.receiveShadow = true; rightArch.castShadow = true;
+                    vanGroup.add(rightArch);
+                }
+            }
+            
+            // Re-validate object positions when van changes
+            objects.forEach(obj => {
+                clampToVan(obj, obj.position);
+            });
+        }
+        
+        buildVanGeometry(); // Initial draw
+
+        // ==========================================
+        // 4. CONFIGURATION BINDINGS
+        // ==========================================
+        function updateConfigFromUI() {
+            vanState.length = parseFloat(document.getElementById('van-len').value);
+            
+            let rawFront = parseFloat(document.getElementById('van-front-len').value);
+            vanState.frontLength = Math.min(rawFront, vanState.length);
+            document.getElementById('van-front-len').value = vanState.frontLength; // Update slider if clamped
+
+            vanState.maxHeight = parseFloat(document.getElementById('van-height').value);
+            vanState.maxWidth = parseFloat(document.getElementById('van-width-max').value);
+            
+            let rawMinW = parseFloat(document.getElementById('van-width-min').value);
+            vanState.narrowWidth = Math.min(rawMinW, vanState.maxWidth);
+            
+            let rawArchH = parseFloat(document.getElementById('van-arch-h').value);
+            vanState.archHeight = Math.min(rawArchH, vanState.maxHeight - 0.1);
+
+            // Update UI Labels
+            document.getElementById('val-len').innerText = vanState.length.toFixed(2);
+            document.getElementById('val-front-len').innerText = vanState.frontLength.toFixed(2);
+            document.getElementById('val-height').innerText = vanState.maxHeight.toFixed(2);
+            document.getElementById('val-width-max').innerText = vanState.maxWidth.toFixed(2);
+            document.getElementById('val-width-min').innerText = vanState.narrowWidth.toFixed(2);
+            document.getElementById('val-arch-h').innerText = vanState.archHeight.toFixed(2);
+
+            buildVanGeometry();
+        }
+        
+        ['van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h'].forEach(id => {
+            document.getElementById(id).addEventListener('input', updateConfigFromUI);
+        });
+
+        // ==========================================
+        // 5. PHYSICS & COLLISION SYSTEM (Optimized)
+        // ==========================================
+        // Cached Box3 instances to prevent GC spikes during drag
+        const tempBox1 = new THREE.Box3();
+        const tempBox2 = new THREE.Box3();
+
+        function clampToVan(obj, pos) {
+            const w = obj.geometry.parameters.width;
+            const h = obj.geometry.parameters.height;
+            const d = obj.geometry.parameters.depth;
+
+            const zSplitLine = -(vanState.length / 2) + vanState.frontLength;
+            const objBottom = pos.y - (h / 2);
+            const objRear = pos.z + (d / 2); // Z grows backwards
+
+            let activeWidth = vanState.maxWidth;
+
+            // Constraint: Object is in rear section and below arch height
+            if (objRear > zSplitLine + 0.01 && objBottom < vanState.archHeight - 0.01) {
+                activeWidth = vanState.narrowWidth;
+                
+                // If it's physically too wide for the narrow section, force it UP
+                if (w > vanState.narrowWidth + 0.02) {
+                    pos.y = Math.max(vanState.archHeight + h/2, pos.y);
+                    activeWidth = vanState.maxWidth; 
+                }
+            }
+
+            const limitX = Math.max(0, activeWidth / 2 - w / 2);
+            const limitY = Math.max(h/2, vanState.maxHeight - h / 2);
+            const limitZ = Math.max(0, vanState.length / 2 - d / 2);
+
+            pos.x = Math.max(-limitX, Math.min(limitX, pos.x));
+            pos.y = Math.max(h / 2, Math.min(limitY, pos.y));
+            pos.z = Math.max(-limitZ, Math.min(limitZ, pos.z));
+        }
+
+        function checkCollision(obj) {
+            obj.updateMatrixWorld();
+            tempBox1.setFromObject(obj);
+            tempBox1.expandByScalar(-0.005); // Tiny tolerance for sliding
+
+            for(let i = 0; i < objects.length; i++) {
+                const other = objects[i];
+                if (other === obj) continue;
+                
+                tempBox2.setFromObject(other);
+                tempBox2.expandByScalar(-0.005);
+                
+                if (tempBox1.intersectsBox(tempBox2)) return true;
+            }
+            return false;
+        }
+
+        function rotate90(obj) {
+            const w = obj.geometry.parameters.width;
+            const h = obj.geometry.parameters.height;
+            const d = obj.geometry.parameters.depth;
+            
+            // Dispose old
+            obj.geometry.dispose();
+            obj.children[0].geometry.dispose();
+            
+            // Swap Width (X) and Depth (Z)
+            const newGeo = new THREE.BoxGeometry(d, h, w);
+            obj.geometry = newGeo;
+            obj.children[0].geometry = new THREE.EdgesGeometry(newGeo);
+            
+            let originalPos = obj.position.clone();
+            clampToVan(obj, obj.position);
+            
+            // Rollback if collision detected
+            if (document.getElementById('toggle-snap').checked && checkCollision(obj)) {
+                obj.geometry.dispose();
+                obj.children[0].geometry.dispose();
+                const oldGeo = new THREE.BoxGeometry(w, h, d);
+                obj.geometry = oldGeo;
+                obj.children[0].geometry = new THREE.EdgesGeometry(oldGeo);
+                obj.position.copy(originalPos);
+                
+                // Visual feedback for failed rotation
+                const origColor = obj.material.emissive.getHex();
+                obj.material.emissive.setHex(0xff0000);
+                setTimeout(() => { if(obj) obj.material.emissive.setHex(origColor); }, 150);
+            }
+        }
+
+        // ==========================================
+        // 6. INTERACTION CONTROLS
+        // ==========================================
+        const orbitControls = new OrbitControls(camera, renderer.domElement);
+        orbitControls.target.set(0, 1, 0);
+        orbitControls.maxPolarAngle = Math.PI / 2 - 0.02; // Don't clip through floor
+        orbitControls.enableDamping = true;
+        orbitControls.dampingFactor = 0.05;
+
+        const dragControls = new DragControls(objects, camera, renderer.domElement);
+        // Objects carry a child LineSegments (edge outline). With recursive raycasting
+        // (the default), a click can hit that child instead of the box itself — Line
+        // raycasting uses a generous threshold, so this happens often in practice.
+        // That breaks dragging (moves only the outline) and throws when code assumes
+        // a Mesh (e.g. reading .material.emissive or .geometry.parameters.height on
+        // an EdgesGeometry/LineBasicMaterial). Restricting to non-recursive picks
+        // ensures only the top-level objects in `objects` are ever selected.
+        dragControls.recursive = false;
+
+        let lastValidPos = new THREE.Vector3();
+        let activeObj = null;
+        let isDragging = false;
+
+        // Defense in depth: even with non-recursive picking, guard against any
+        // object that isn't one of our tracked, fully-formed boxes (e.g. if it was
+        // removed via "Alle entfernen" in the same tick as a pending event).
+        function isValidTarget(obj) {
+            return !!obj && objects.includes(obj) && obj.material && obj.material.emissive
+                && obj.geometry && obj.geometry.parameters;
+        }
+
+        // Hover Effects
+        dragControls.addEventListener('hoveron', (e) => {
+            if (!isDragging && isValidTarget(e.object)) {
+                activeObj = e.object;
+                activeObj.material.emissive.setHex(0x222222);
+                document.body.style.cursor = 'grab';
+            }
+        });
+
+        dragControls.addEventListener('hoveroff', (e) => {
+            if (!isDragging && activeObj === e.object) {
+                if (isValidTarget(activeObj)) activeObj.material.emissive.setHex(0x000000);
+                activeObj = null;
+                document.body.style.cursor = 'auto';
+            }
+        });
+
+        dragControls.addEventListener('dragstart', function (event) {
+            if (!isValidTarget(event.object)) return;
+            orbitControls.enabled = false;
+            isDragging = true;
+            activeObj = event.object;
+            activeObj.material.emissive.setHex(0x444444);
+            document.body.style.cursor = 'grabbing';
+            lastValidPos.copy(activeObj.position);
+        });
+
+        dragControls.addEventListener('dragend', function (event) {
+            orbitControls.enabled = true;
+            isDragging = false;
+            document.body.style.cursor = 'auto';
+            if (isValidTarget(activeObj)) activeObj.material.emissive.setHex(0x000000);
+            if (!isValidTarget(event.object)) return;
+
+            // Final floor snap check
+            if(event.object.position.y < event.object.geometry.parameters.height / 2 + 0.02) {
+                event.object.position.y = event.object.geometry.parameters.height / 2;
+            }
+        });
+
+        // The core physics drag loop
+        dragControls.addEventListener('drag', function (event) {
+            const obj = event.object;
+            if (!isValidTarget(obj)) return;
+            const doSnap = document.getElementById('toggle-snap').checked;
+            
+            let targetX = obj.position.x;
+            let targetY = obj.position.y;
+            let targetZ = obj.position.z;
+
+            // Optional Grid Snapping (0.05m = 5cm)
+            if (doSnap) {
+                targetX = Math.round(targetX / 0.05) * 0.05;
+                targetY = Math.round(targetY / 0.05) * 0.05;
+                targetZ = Math.round(targetZ / 0.05) * 0.05;
+            }
+
+            let p = lastValidPos.clone();
+            
+            // Test axes independently to allow sliding against walls/objects
+            const testAxis = (axis, targetVal) => {
+                p[axis] = targetVal;
+                clampToVan(obj, p);
+                obj.position.copy(p);
+                
+                if (doSnap && checkCollision(obj)) {
+                    p[axis] = lastValidPos[axis]; // rollback axis
+                } else {
+                    lastValidPos[axis] = p[axis]; // accept axis
+                }
+            };
+
+            testAxis('x', targetX);
+            testAxis('y', targetY);
+            testAxis('z', targetZ);
+            
+            // Final apply
+            obj.position.copy(lastValidPos);
+        });
+
+        // Rotation listener
+        window.addEventListener('keydown', (e) => {
+            if ((e.key === 'r' || e.key === 'R') && activeObj) {
+                rotate90(activeObj);
+            }
+        });
+
+        // ==========================================
+        // 7. OBJECT MANAGEMENT
+        // ==========================================
+        function updateStats() { 
+            document.getElementById('obj-count').innerText = objects.length; 
+        }
+
+        function addBox(w, h, d, colorHex) {
+            const geo = new THREE.BoxGeometry(w, h, d);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: colorHex, 
+                roughness: 0.6, 
+                metalness: 0.1,
+                polygonOffset: true,
+                polygonOffsetFactor: 1, 
+                polygonOffsetUnits: 1
+            });
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+            
+            // Better edges
+            const objEdges = new THREE.EdgesGeometry(geo);
+            const objLine = new THREE.LineSegments(objEdges, new THREE.LineBasicMaterial({ 
+                color: 0x000000, linewidth: 1, transparent: true, opacity: 0.5 
+            }));
+            mesh.add(objLine);
+            
+            // Spawn safely near the front top
+            mesh.position.set(0, vanState.maxHeight - (h/2) - 0.1, -vanState.length/2 + (d/2) + 0.2);
+            
+            scene.add(mesh);
+            objects.push(mesh);
+            updateStats();
+        }
+
+        // Button Bindings
+        document.getElementById('add-eb-medium').addEventListener('click', () => addBox(0.6, 0.32, 0.4, 0x64748b));
+        document.getElementById('add-wood-small').addEventListener('click', () => addBox(1.2, 0.02, 0.8, 0xd97706));
+
+        document.getElementById('add-custom').addEventListener('click', () => {
+            const w = parseFloat(document.getElementById('custom-w').value) / 100;
+            const h = parseFloat(document.getElementById('custom-h').value) / 100;
+            const d = parseFloat(document.getElementById('custom-d').value) / 100;
+            const c = document.getElementById('custom-c').value;
+
+            // Guard against NaN (empty/invalid input), non-positive, and absurdly
+            // large values (e.g. a stray extra digit) that would silently fail or
+            // spawn a box far outside the visible/interactive area.
+            const isSane = v => Number.isFinite(v) && v > 0 && v <= 10;
+            if (isSane(w) && isSane(h) && isSane(d)) {
+                addBox(w, h, d, c);
+            } else {
+                alert('Bitte gültige Maße zwischen 1 und 1000 cm eingeben.');
+            }
+        });
+
+        document.getElementById('clear-all').addEventListener('click', () => {
+            [...objects].forEach(obj => {
+                scene.remove(obj);
+                obj.geometry.dispose();
+                if(Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+                else obj.material.dispose();
+            });
+            objects.length = 0;
+            activeObj = null;
+            updateStats();
+        });
+
+        // ==========================================
+        // 8. RENDER LOOP
+        // ==========================================
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            orbitControls.update(); // needed for damping
+            renderer.render(scene, camera);
+        }
+        animate();
+    </script>
+</body>
+</html>

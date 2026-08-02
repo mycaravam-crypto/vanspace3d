@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VanSpace 3D - Prototype</title>
+    <!-- Tailwind CSS for UI -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #0f172a; user-select: none; font-family: 'Inter', sans-serif; }
+        /* Custom scrollbar for a cleaner look */
+        #ui-container::-webkit-scrollbar { width: 4px; }
+        #ui-container::-webkit-scrollbar-track { background: transparent; }
+        #ui-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+
+        .tab-btn { transition: all 0.2s ease; }
+        .tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+        .tab-btn.inactive { color: #64748b; border-bottom: 2px solid transparent; }
+        .tab-btn.inactive:hover { color: #334155; }
+
+        input[type="range"] { cursor: pointer; }
+        input[type="number"] { transition: border-color 0.2s; }
+        button { transition: all 0.2s ease; cursor: pointer; }
+    </style>
+</head>
+<body class="antialiased text-gray-800">
+    <!-- UI Overlay -->
+    <div id="ui-container" class="absolute top-4 left-4 bg-white/95 backdrop-blur p-5 rounded-xl shadow-2xl w-80 max-h-[95vh] overflow-y-auto border border-gray-200 z-10 flex flex-col gap-4">
+
+        <!-- Header -->
+        <div>
+            <h1 class="text-xl font-bold text-gray-900 tracking-tight">VanSpace 3D</h1>
+            <p class="text-xs text-gray-500 font-medium">Prototype v7 (Vite)</p>
+        </div>
+
+        <!-- Tabs -->
+        <div class="flex border-b border-gray-200">
+            <button id="tab-objects" class="tab-btn active flex-1 py-2 text-sm font-semibold">Objekte</button>
+            <button id="tab-config" class="tab-btn inactive flex-1 py-2 text-sm font-semibold">Laderaum</button>
+        </div>
+
+        <!-- PANEL: OBJECTS -->
+        <div id="panel-objects" class="flex flex-col gap-4">
+
+            <!-- Snapping Toggle -->
+            <label class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
+                <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
+                <span class="text-xs font-semibold text-slate-700">5cm Raster & Kollisionen aktiv</span>
+            </label>
+
+            <!-- Standard Objects (rendered from src/library.js by ui.js) -->
+            <div>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Standard-Bibliothek</h2>
+                <div id="standard-library-list" class="grid grid-cols-1 gap-2"></div>
+            </div>
+
+            <!-- Custom Object Generator -->
+            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt (cm)</h2>
+                <div class="grid grid-cols-4 gap-2 mb-3">
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Breite</label>
+                        <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Höhe</label>
+                        <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Tiefe</label>
+                        <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-slate-500 font-bold mb-1">Gewicht</label>
+                        <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                    </div>
+                </div>
+                <div class="flex space-x-2">
+                    <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
+                    <button id="add-custom" class="flex-1 bg-slate-800 text-white text-xs font-semibold rounded hover:bg-slate-700 shadow-sm">Generieren</button>
+                </div>
+            </div>
+
+            <!-- Stats & Clear -->
+            <div class="flex flex-col gap-2 pt-2 border-t border-slate-200">
+                <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+                    <span>Plazierte Objekte:</span>
+                    <span id="obj-count" class="bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full text-xs">0</span>
+                </div>
+                <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+                    <span>Gesamtgewicht:</span>
+                    <span><span id="total-weight">0.0</span> kg</span>
+                </div>
+                <div class="flex justify-between items-center text-[11px] text-slate-500">
+                    <span>Schwerpunkt:</span>
+                    <span id="cog-info">–</span>
+                </div>
+                <button id="clear-all" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 text-sm font-semibold">Alle entfernen</button>
+            </div>
+        </div>
+
+        <!-- PANEL: CONFIGURATION -->
+        <div id="panel-config" class="hidden flex-col gap-4">
+
+            <!-- Dimension Sliders -->
+            <div class="space-y-3">
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Gesamtlänge <span class="font-normal text-slate-500 font-mono"><span id="val-len">3.3</span>m</span>
+                    </label>
+                    <input type="range" id="van-len" min="2.0" max="5.0" step="0.1" value="3.3" class="w-full accent-blue-600">
+                </div>
+                <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
+                    <label class="flex justify-between text-xs font-semibold text-blue-800 mb-1">
+                        Länge Vollbreite (Vorn) <span class="font-normal text-blue-600 font-mono"><span id="val-front-len">1.6</span>m</span>
+                    </label>
+                    <input type="range" id="van-front-len" min="0.0" max="5.0" step="0.1" value="1.6" class="w-full accent-blue-500">
+                    <p class="text-[9px] text-blue-600/80 mt-1 uppercase font-bold tracking-wider">Bereich ohne Radkästen</p>
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Gesamthöhe <span class="font-normal text-slate-500 font-mono"><span id="val-height">1.9</span>m</span>
+                    </label>
+                    <input type="range" id="van-height" min="1.2" max="2.5" step="0.1" value="1.9" class="w-full accent-blue-600">
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Breite (Maximal) <span class="font-normal text-slate-500 font-mono"><span id="val-width-max">1.8</span>m</span>
+                    </label>
+                    <input type="range" id="van-width-max" min="1.4" max="2.4" step="0.05" value="1.8" class="w-full accent-blue-600">
+                </div>
+            </div>
+
+            <!-- Radkästen Sliders -->
+            <div class="pt-3 border-t border-slate-200 space-y-3">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Radkästen & Verengung</h2>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Breite Unten <span class="font-normal text-slate-500 font-mono"><span id="val-width-min">1.3</span>m</span>
+                    </label>
+                    <input type="range" id="van-width-min" min="0.8" max="1.6" step="0.05" value="1.3" class="w-full accent-emerald-500">
+                </div>
+                <div>
+                    <label class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
+                        Höhe Radkästen <span class="font-normal text-slate-500 font-mono"><span id="val-arch-h">0.45</span>m</span>
+                    </label>
+                    <input type="range" id="van-arch-h" min="0.1" max="0.8" step="0.05" value="0.45" class="w-full accent-emerald-500">
+                </div>
+            </div>
+        </div>
+
+        <!-- HISTORY: Undo/Redo — always visible, not tab-scoped -->
+        <div class="flex gap-2">
+            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
+            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
+        </div>
+
+        <!-- PROJECT: Save/Load/Reset (localStorage) + Export/Import (JSON file) — always visible, not tab-scoped -->
+        <div class="pt-2 border-t border-slate-200 flex flex-col gap-2">
+            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Projekt</h2>
+            <div class="flex gap-2">
+                <button id="save-config" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 text-xs font-semibold">Speichern</button>
+                <button id="load-config" class="flex-1 py-2 bg-slate-50 text-slate-700 border border-slate-200 rounded-md hover:bg-slate-100 hover:border-slate-300 text-xs font-semibold">Laden</button>
+                <button id="reset-config" class="flex-1 py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 text-xs font-semibold">Reset</button>
+            </div>
+            <div class="flex gap-2">
+                <button id="export-config" class="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold">Export (.json)</button>
+                <label for="import-config-file" class="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold text-center cursor-pointer">Import (.json)</label>
+                <input type="file" id="import-config-file" accept="application/json,.json" class="hidden">
+            </div>
+            <p id="persistence-status" class="text-[11px] text-emerald-600 font-semibold h-4"></p>
+        </div>
+
+        <!-- Instructions / Helpers -->
+        <div class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed shadow-inner">
+            <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
+            <p class="mb-1"><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
+            <p class="mb-1"><span class="font-bold">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>.</p>
+            <p class="mb-1"><span class="font-bold">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">D</kbd>.</p>
+            <p class="mb-1"><span class="font-bold">Hoch/Runter:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↓</kbd> (5cm).</p>
+            <p class="mb-1"><span class="font-bold">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
+            <p><span class="font-bold">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Y</kbd>.</p>
+        </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
