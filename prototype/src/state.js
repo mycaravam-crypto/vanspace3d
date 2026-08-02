@@ -12,6 +12,9 @@ export const DEFAULT_VAN_STATE = Object.freeze({
     maxWidth: 1.8,
     narrowWidth: 1.3,
     archHeight: 0.45,
+    // Illustrative default max payload (kg) — not a real vehicle spec, just a
+    // starting point the user is meant to adjust for their actual vehicle.
+    maxPayload: 400,
 });
 
 export const vanState = { ...DEFAULT_VAN_STATE };

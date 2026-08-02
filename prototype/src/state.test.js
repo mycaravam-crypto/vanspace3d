@@ -10,6 +10,7 @@ describe('initial state', () => {
             maxWidth: 1.8,
             narrowWidth: 1.3,
             archHeight: 0.45,
+            maxPayload: 400,
         });
     });
 

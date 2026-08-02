@@ -84,9 +84,11 @@ function mountFixture() {
         <input type="range" id="van-width-max" value="1.8">
         <input type="range" id="van-width-min" value="1.3">
         <input type="range" id="van-arch-h" value="0.45">
+        <input type="range" id="van-payload" min="50" max="2000" value="400">
         <span id="val-len"></span>
         <span id="val-front-len"></span>
         <span id="val-height"></span>
+        <span id="val-payload"></span>
         <span id="val-width-max"></span>
         <span id="val-width-min"></span>
         <span id="val-arch-h"></span>
@@ -214,6 +216,15 @@ describe('config sliders', () => {
         captureUndoPoint.mockClear();
         document.getElementById('van-height').dispatchEvent(new Event('pointerdown', { bubbles: true }));
         expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates maxPayload and its label on input', () => {
+        const slider = document.getElementById('van-payload');
+        slider.value = '650';
+        slider.dispatchEvent(new Event('input', { bubbles: true }));
+
+        expect(vanState.maxPayload).toBe(650);
+        expect(document.getElementById('val-payload').textContent).toBe('650');
     });
 });
 

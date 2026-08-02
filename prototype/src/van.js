@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { scene } from './scene.js';
 import { vanState, objects } from './state.js';
 import { clampToVan } from './collision.js';
+import { refreshCenterOfGravity } from './cog.js';
 
 // ==========================================
 // VAN CONFIGURATION & GEOMETRY
@@ -108,4 +109,8 @@ export function buildVanGeometry() {
     objects.forEach((obj) => {
         clampToVan(obj, obj.position);
     });
+
+    // maxWidth/maxPayload changes affect the payload-limit and off-center
+    // warnings even when no object moved, so refresh them here too.
+    refreshCenterOfGravity();
 }
