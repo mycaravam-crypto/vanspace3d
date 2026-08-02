@@ -1,7 +1,7 @@
 import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, flashReject, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject, DEFAULT_WEIGHT,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -266,6 +266,8 @@ function renderObjectList() {
                     <div class="text-xs font-medium text-slate-700 truncate">${label}</div>
                     <div class="text-[10px] text-slate-400 font-mono">${dims} &middot; ${weight}kg</div>
                 </button>
+                <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&uarr;</button>
+                <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&darr;</button>
                 <button type="button" data-action="lock" data-idx="${i}" title="Sperren/Entsperren (L)" class="p-1.5 rounded ${locked ? 'text-red-500 hover:text-red-600' : 'text-slate-300 hover:text-slate-500'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
                 <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
             </div>`;
@@ -281,6 +283,11 @@ function renderObjectList() {
             const action = btn.dataset.action;
             if (action === 'select') {
                 selectObject(obj);
+            } else if (action === 'up' || action === 'down') {
+                if (obj.userData.locked) { flashReject(obj); return; }
+                captureUndoPoint();
+                moveVertical(obj, action === 'up' ? 0.05 : -0.05, isSnapEnabled());
+                refreshHistoryButtons();
             } else if (action === 'lock') {
                 captureUndoPoint();
                 toggleLock(obj);

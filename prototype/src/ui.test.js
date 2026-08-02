@@ -7,6 +7,7 @@ vi.mock('./objects.js', () => ({
     clearUnlockedObjects: vi.fn(),
     toggleLock: vi.fn(),
     removeObject: vi.fn(),
+    moveVertical: vi.fn(),
     flashReject: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
@@ -33,7 +34,7 @@ vi.mock('./controls.js', () => ({
 const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, flashReject,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
@@ -126,6 +127,7 @@ beforeEach(() => {
     clearUnlockedObjects.mockClear();
     toggleLock.mockClear();
     removeObject.mockClear();
+    moveVertical.mockClear();
     flashReject.mockClear();
     selectObject.mockClear();
     saveConfig.mockClear();
@@ -461,6 +463,41 @@ describe('object list panel', () => {
 
         document.querySelector('#object-list button[data-action="select"]').click();
         expect(selectObject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the up icon moves the object up 5cm respecting the snap toggle, and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        document.getElementById('toggle-snap').checked = false;
+
+        document.querySelector('#object-list button[data-action="up"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(moveVertical).toHaveBeenCalledWith(obj, 0.05, false);
+    });
+
+    it('clicking the down icon moves the object down 5cm', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="down"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(moveVertical).toHaveBeenCalledWith(obj, -0.05, true);
+    });
+
+    it('clicking up/down on a locked object flashes it instead of moving it', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="up"]').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(moveVertical).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
     });
 
     it('clicking the lock icon toggles lock and captures an undo point', () => {
