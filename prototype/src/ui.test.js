@@ -50,6 +50,11 @@ function mountFixture() {
     document.body.innerHTML = `
         <input type="checkbox" id="toggle-snap" checked>
 
+        <button id="help-toggle"></button>
+        <div id="help-modal" class="hidden">
+            <button id="help-close"></button>
+        </div>
+
         <button id="tab-objects" class="tab-btn active flex-1 py-2 text-sm font-semibold"></button>
         <button id="tab-config" class="tab-btn inactive flex-1 py-2 text-sm font-semibold"></button>
         <div id="panel-objects" class="flex"></div>
@@ -160,6 +165,52 @@ describe('tab switching', () => {
         expect(document.getElementById('panel-objects').classList.contains('hidden')).toBe(false);
         expect(document.getElementById('panel-config').classList.contains('hidden')).toBe(true);
         expect(document.getElementById('tab-objects').className).toContain('active');
+    });
+});
+
+describe('help modal', () => {
+    it('is hidden by default and opens on toggle click', () => {
+        const modal = document.getElementById('help-modal');
+        expect(modal.classList.contains('hidden')).toBe(true);
+
+        document.getElementById('help-toggle').click();
+        expect(modal.classList.contains('hidden')).toBe(false);
+    });
+
+    it('closes on the close button', () => {
+        document.getElementById('help-toggle').click();
+        document.getElementById('help-close').click();
+        expect(document.getElementById('help-modal').classList.contains('hidden')).toBe(true);
+    });
+
+    it('closes on a backdrop click (event target is the modal itself)', () => {
+        const modal = document.getElementById('help-modal');
+        document.getElementById('help-toggle').click();
+        expect(modal.classList.contains('hidden')).toBe(false);
+
+        modal.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        expect(modal.classList.contains('hidden')).toBe(true);
+    });
+
+    it('does not close on a click that bubbles up from inside the dialog', () => {
+        const modal = document.getElementById('help-modal');
+        document.getElementById('help-toggle').click();
+
+        const inner = document.createElement('div');
+        modal.appendChild(inner);
+        inner.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+        expect(modal.classList.contains('hidden')).toBe(false);
+    });
+
+    it('closes on Escape, only while open', () => {
+        const modal = document.getElementById('help-modal');
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(modal.classList.contains('hidden')).toBe(true); // was already closed, still closed
+
+        document.getElementById('help-toggle').click();
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+        expect(modal.classList.contains('hidden')).toBe(true);
     });
 });
 
