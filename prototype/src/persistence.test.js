@@ -140,6 +140,16 @@ describe('loadConfig', () => {
         expect(vanState.archHeight).toBe(0.6); // missing field left alone
     });
 
+    it('round-trips maxPayload like any other vanState field', () => {
+        vanState.maxPayload = 650;
+        saveConfig();
+
+        Object.assign(vanState, DEFAULT_VAN_STATE);
+        loadConfig();
+
+        expect(vanState.maxPayload).toBe(650);
+    });
+
     it('round-trips the weight of each object', () => {
         addBox(0.6, 0.32, 0.4, 0x64748b, 17.5);
         saveConfig();

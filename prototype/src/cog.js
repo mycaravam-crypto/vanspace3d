@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { scene } from './scene.js';
-import { objects } from './state.js';
+import { vanState, objects } from './state.js';
+
+// Fraction of the van's max width beyond which the load is flagged as
+// off-center. A rough packing heuristic, not a real axle-load calculation —
+// this app doesn't model axle positions.
+const OFF_CENTER_WIDTH_FRACTION = 0.25;
 
 // A small floor marker showing the weighted center of gravity (X/Z plan
 // position) of all placed objects. Not part of vanGroup — it must survive
@@ -35,13 +40,21 @@ export function computeCenterOfGravity() {
 }
 
 // Recomputes the center of gravity and refreshes the 3D marker plus the
-// #total-weight / #cog-info DOM readouts (no-ops if those elements aren't
-// present, same defensive pattern as updateStats() in objects.js).
+// #total-weight / #cog-info / #payload-warning DOM readouts (no-ops if those
+// elements aren't present, same defensive pattern as updateStats() in
+// objects.js).
 export function refreshCenterOfGravity() {
     const cog = computeCenterOfGravity();
+    const totalWeight = cog ? cog.totalWeight : 0;
 
     const weightEl = document.getElementById('total-weight');
-    if (weightEl) weightEl.textContent = (cog ? cog.totalWeight : 0).toFixed(1);
+    if (weightEl) {
+        weightEl.textContent = totalWeight.toFixed(1);
+        weightEl.classList.toggle('text-red-600', totalWeight > vanState.maxPayload);
+    }
+
+    const payloadLabelEl = document.getElementById('max-payload-label');
+    if (payloadLabelEl) payloadLabelEl.textContent = vanState.maxPayload;
 
     const cogEl = document.getElementById('cog-info');
 
@@ -57,6 +70,19 @@ export function refreshCenterOfGravity() {
     } else {
         cogMarker.visible = false;
         if (cogEl) cogEl.textContent = '–';
+    }
+
+    const warningEl = document.getElementById('payload-warning');
+    if (warningEl) {
+        const overloaded = totalWeight > vanState.maxPayload;
+        const offCenter = !!cog && Math.abs(cog.x) > vanState.maxWidth * OFF_CENTER_WIDTH_FRACTION;
+
+        if (overloaded) {
+            warningEl.textContent = `Überladen: ${totalWeight.toFixed(1)}kg von ${vanState.maxPayload}kg Zuladung.`;
+        } else if (offCenter) {
+            warningEl.textContent = 'Schwerpunkt weit außermittig – Ladung ggf. umverteilen.';
+        }
+        warningEl.classList.toggle('hidden', !overloaded && !offCenter);
     }
 
     return cog;

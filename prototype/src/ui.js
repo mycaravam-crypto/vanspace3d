@@ -47,6 +47,7 @@ function updateLabels() {
     document.getElementById('val-width-max').textContent = vanState.maxWidth.toFixed(2);
     document.getElementById('val-width-min').textContent = vanState.narrowWidth.toFixed(2);
     document.getElementById('val-arch-h').textContent = vanState.archHeight.toFixed(2);
+    document.getElementById('val-payload').textContent = vanState.maxPayload.toFixed(0);
 }
 
 function updateConfigFromUI() {
@@ -65,11 +66,15 @@ function updateConfigFromUI() {
     const rawArchH = parseFloat(document.getElementById('van-arch-h').value);
     vanState.archHeight = Math.min(rawArchH, vanState.maxHeight - 0.1);
 
+    vanState.maxPayload = parseFloat(document.getElementById('van-payload').value);
+
     updateLabels();
     buildVanGeometry();
 }
 
-const CONFIG_SLIDER_IDS = ['van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h'];
+const CONFIG_SLIDER_IDS = [
+    'van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h', 'van-payload',
+];
 
 function initConfigSliders() {
     CONFIG_SLIDER_IDS.forEach((id) => {
@@ -96,6 +101,7 @@ export function syncSlidersFromState() {
     document.getElementById('van-width-max').value = vanState.maxWidth;
     document.getElementById('van-width-min').value = vanState.narrowWidth;
     document.getElementById('van-arch-h').value = vanState.archHeight;
+    document.getElementById('van-payload').value = vanState.maxPayload;
     updateLabels();
 }
 

@@ -104,4 +104,16 @@ describe('buildVanGeometry', () => {
 
         expect(Math.abs(mesh.position.x)).toBeLessThanOrEqual(vanState.maxWidth / 2 - 0.5 / 2 + 1e-9);
     });
+
+    it('refreshes the weight/COG readouts, since maxWidth/maxPayload changes affect their warnings too', () => {
+        document.body.innerHTML = '<span id="total-weight"></span><span id="cog-info"></span>';
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.4), new THREE.MeshStandardMaterial());
+        mesh.position.set(0, 0.1, 0);
+        mesh.userData.weight = 12.5;
+        objects.push(mesh);
+
+        buildVanGeometry();
+
+        expect(document.getElementById('total-weight').textContent).toBe('12.5');
+    });
 });
