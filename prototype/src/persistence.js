@@ -133,6 +133,85 @@ export function loadConfig() {
 }
 
 // ==========================================
+// Named projects — multiple independently saved layouts, distinct from the
+// single autosave slot above. Same localStorage mechanism, a separate key
+// holding an array of {id, name, savedAt, payload} entries.
+// ==========================================
+const PROJECTS_KEY = 'vanspace3d.projects.v1';
+
+function readProjectsStore() {
+    return safeStorageCall(() => {
+        const raw = localStorage.getItem(PROJECTS_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    }, []);
+}
+
+function writeProjectsStore(list) {
+    return safeStorageCall(() => {
+        localStorage.setItem(PROJECTS_KEY, JSON.stringify(list));
+        return true;
+    }, false);
+}
+
+function generateProjectId() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Metadata only (no payload) — cheap to call for rendering a list.
+export function listProjects() {
+    return readProjectsStore()
+        .map((p) => ({ id: p.id, name: p.name, savedAt: p.savedAt }))
+        .sort((a, b) => b.savedAt - a.savedAt);
+}
+
+// Creates a new project, or overwrites the existing one with the same name
+// ("save as" semantics: same name = update, new name = new slot).
+export function saveNamedProject(name) {
+    const trimmed = (name || '').trim();
+    if (!trimmed) return false;
+
+    const list = readProjectsStore();
+    const existingIdx = list.findIndex((p) => p.name === trimmed);
+    const entry = {
+        id: existingIdx >= 0 ? list[existingIdx].id : generateProjectId(),
+        name: trimmed,
+        savedAt: Date.now(),
+        payload: serializeState(),
+    };
+    if (existingIdx >= 0) list[existingIdx] = entry; else list.push(entry);
+    return writeProjectsStore(list);
+}
+
+export function loadNamedProject(id) {
+    const entry = readProjectsStore().find((p) => p.id === id);
+    if (!entry || !isValidPayloadShape(entry.payload)) return false;
+    applyState(entry.payload);
+    return true;
+}
+
+// Returns false (no-op) if no project with that id exists.
+export function deleteNamedProject(id) {
+    const list = readProjectsStore();
+    const next = list.filter((p) => p.id !== id);
+    if (next.length === list.length) return false;
+    return writeProjectsStore(next);
+}
+
+export function renameNamedProject(id, newName) {
+    const trimmed = (newName || '').trim();
+    if (!trimmed) return false;
+
+    const list = readProjectsStore();
+    const entry = list.find((p) => p.id === id);
+    if (!entry) return false;
+
+    entry.name = trimmed;
+    return writeProjectsStore(list);
+}
+
+// ==========================================
 // JSON file export/import
 // ==========================================
 function downloadTextFile(content, filename, mimeType) {

@@ -7,6 +7,7 @@ import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
 import {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
+    listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } from './persistence.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
 import { selectObject, setCameraView } from './controls.js';
@@ -240,6 +241,7 @@ function escapeHtml(str) {
 const ICON_LOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.5"/></svg>';
 const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7"/></svg>';
+const ICON_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
 
 // Renders the list of placed objects (label, size, weight, lock state) so an
 // object can be found and selected/locked/deleted without hunting for it in
@@ -419,6 +421,84 @@ function initPersistence() {
     });
 }
 
+// ==========================================
+// NAMED PROJECTS — multiple independently saved layouts, distinct from the
+// single autosave slot handled by initPersistence() above.
+// ==========================================
+function formatSavedAt(ts) {
+    const d = new Date(ts);
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString('de-DE', { dateStyle: 'short', timeStyle: 'short' });
+}
+
+function renderProjectList() {
+    const container = document.getElementById('project-list');
+    if (!container) return;
+
+    const list = listProjects();
+    if (list.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic px-1 py-1">Keine gespeicherten Projekte.</p>';
+        return;
+    }
+
+    container.innerHTML = list.map((p) => `
+        <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-md hover:border-blue-300 hover:bg-blue-50/50">
+            <button type="button" data-action="load-project" data-id="${p.id}" class="flex-1 min-w-0 text-left py-0.5">
+                <div class="text-xs font-medium text-slate-700 truncate">${escapeHtml(p.name)}</div>
+                <div class="text-[10px] text-slate-400 font-mono">${formatSavedAt(p.savedAt)}</div>
+            </button>
+            <button type="button" data-action="rename-project" data-id="${p.id}" title="Umbenennen" class="p-1.5 rounded text-slate-300 hover:text-slate-600">${ICON_PENCIL}</button>
+            <button type="button" data-action="delete-project" data-id="${p.id}" title="L&ouml;schen" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
+        </div>`).join('');
+
+    container.querySelectorAll('button[data-action]').forEach((btn) => {
+        const { id } = btn.dataset;
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = btn.dataset.action;
+
+            if (action === 'load-project') {
+                captureUndoPoint();
+                if (loadNamedProject(id)) {
+                    syncSlidersFromState();
+                    refreshHistoryButtons();
+                    showStatus('Projekt geladen ✓');
+                } else {
+                    refreshHistoryButtons();
+                    showStatus('Laden fehlgeschlagen.');
+                }
+            } else if (action === 'rename-project') {
+                const current = listProjects().find((p) => p.id === id);
+                const next = prompt('Neuer Projektname:', current ? current.name : '');
+                if (next === null) return; // cancelled
+                showStatus(renameNamedProject(id, next) ? 'Umbenannt ✓' : 'Umbenennen fehlgeschlagen.');
+                renderProjectList();
+            } else if (action === 'delete-project') {
+                const current = listProjects().find((p) => p.id === id);
+                if (!confirm(`"${current ? current.name : 'Projekt'}" wirklich löschen?`)) return;
+                deleteNamedProject(id);
+                renderProjectList();
+                showStatus('Gelöscht ✓');
+            }
+        });
+    });
+}
+
+function initNamedProjects() {
+    renderProjectList();
+
+    document.getElementById('save-as-project').addEventListener('click', () => {
+        const name = prompt('Projektname:');
+        if (name === null) return; // cancelled
+        if (saveNamedProject(name)) {
+            renderProjectList();
+            showStatus('Gespeichert ✓');
+        } else {
+            showStatus('Speichern fehlgeschlagen (Name leer?).');
+        }
+    });
+}
+
 export function initUI() {
     initTabs();
     initVehiclePresets();
@@ -426,6 +506,7 @@ export function initUI() {
     initObjectPanel();
     initHistoryButtons();
     initPersistence();
+    initNamedProjects();
     initCameraToolbar();
     initHelpModal();
 
