@@ -61,6 +61,60 @@ function initHelpModal() {
 }
 
 // ==========================================
+// RESPONSIVE PANEL (mobile bottom sheet)
+// ==========================================
+// Below the md breakpoint, #ui-container becomes a full-width bottom sheet
+// (see index.html) that starts collapsed so it doesn't cover the 3D view on
+// a phone/tablet. #panel-toggle expands/collapses it by swapping a couple of
+// Tailwind utility classes; md+ layout is handled entirely by static md:
+// classes in index.html and is unaffected by this toggle.
+const SHEET_COLLAPSED_CLASSES = ['max-h-16', 'overflow-hidden'];
+const SHEET_EXPANDED_CLASSES = ['max-h-[70vh]', 'overflow-y-auto'];
+
+function initResponsivePanel() {
+    const container = document.getElementById('ui-container');
+    const toggle = document.getElementById('panel-toggle');
+    if (!container || !toggle) return;
+
+    // jsdom (test environment) doesn't implement matchMedia — fall back to
+    // "not mobile" so tests can drive the toggle explicitly instead.
+    const mq = typeof window.matchMedia === 'function'
+        ? window.matchMedia('(max-width: 767px)')
+        : { matches: false, addEventListener() {} };
+
+    let collapsed = mq.matches;
+
+    function apply() {
+        if (collapsed) {
+            container.classList.remove(...SHEET_EXPANDED_CLASSES);
+            container.classList.add(...SHEET_COLLAPSED_CLASSES);
+            toggle.innerHTML = '&#9652;'; // ▲ — tap to expand
+            toggle.setAttribute('aria-expanded', 'false');
+        } else {
+            container.classList.remove(...SHEET_COLLAPSED_CLASSES);
+            container.classList.add(...SHEET_EXPANDED_CLASSES);
+            toggle.innerHTML = '&#9662;'; // ▼ — tap to collapse
+            toggle.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    toggle.addEventListener('click', () => {
+        collapsed = !collapsed;
+        apply();
+    });
+
+    // Crossing back into the desktop breakpoint drops the mobile collapsed
+    // state, so resizing a window up never leaves the sheet stuck collapsed
+    // underneath the always-expanded md: layout.
+    mq.addEventListener('change', (e) => {
+        collapsed = e.matches;
+        apply();
+    });
+
+    apply();
+}
+
+// ==========================================
 // CONFIGURATION BINDINGS
 // ==========================================
 // vanState stores lengths in meters (matching the Three.js scene's
@@ -501,6 +555,7 @@ function initNamedProjects() {
 
 export function initUI() {
     initTabs();
+    initResponsivePanel();
     initVehiclePresets();
     initConfigSliders();
     initObjectPanel();

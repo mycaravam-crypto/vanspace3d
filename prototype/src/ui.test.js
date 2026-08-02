@@ -58,6 +58,9 @@ function mountFixture() {
     document.body.innerHTML = `
         <input type="checkbox" id="toggle-snap" checked>
 
+        <div id="ui-container" class="max-h-16 overflow-hidden">
+            <button id="panel-toggle" aria-expanded="false"></button>
+        </div>
         <button id="help-toggle"></button>
         <div id="help-modal" class="hidden">
             <button id="help-close"></button>
@@ -189,6 +192,45 @@ describe('tab switching', () => {
         expect(document.getElementById('panel-objects').classList.contains('hidden')).toBe(false);
         expect(document.getElementById('panel-config').classList.contains('hidden')).toBe(true);
         expect(document.getElementById('tab-objects').className).toContain('active');
+    });
+});
+
+describe('responsive panel (mobile bottom sheet)', () => {
+    // jsdom has no matchMedia, so initResponsivePanel()'s fallback always
+    // reports "not mobile" and initUI() leaves the sheet expanded on init —
+    // these tests drive #panel-toggle explicitly to cover the class-swapping
+    // logic itself, independent of which state a real breakpoint starts in.
+    it('starts expanded (matchMedia unavailable → "not mobile" fallback)', () => {
+        const container = document.getElementById('ui-container');
+        const toggle = document.getElementById('panel-toggle');
+        expect(container.classList.contains('max-h-[70vh]')).toBe(true);
+        expect(container.classList.contains('overflow-y-auto')).toBe(true);
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    });
+
+    it('collapses on toggle click, swapping expanded classes for collapsed ones', () => {
+        const container = document.getElementById('ui-container');
+        const toggle = document.getElementById('panel-toggle');
+
+        toggle.click();
+
+        expect(container.classList.contains('max-h-[70vh]')).toBe(false);
+        expect(container.classList.contains('overflow-y-auto')).toBe(false);
+        expect(container.classList.contains('max-h-16')).toBe(true);
+        expect(container.classList.contains('overflow-hidden')).toBe(true);
+        expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    });
+
+    it('expands again on a second toggle click', () => {
+        const container = document.getElementById('ui-container');
+        const toggle = document.getElementById('panel-toggle');
+
+        toggle.click(); // collapse
+        toggle.click(); // expand
+
+        expect(container.classList.contains('max-h-[70vh]')).toBe(true);
+        expect(container.classList.contains('overflow-y-auto')).toBe(true);
+        expect(toggle.getAttribute('aria-expanded')).toBe('true');
     });
 });
 
