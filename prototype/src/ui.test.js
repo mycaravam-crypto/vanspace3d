@@ -17,6 +17,7 @@ vi.mock('./persistence.js', () => ({
     hasSavedConfig: vi.fn(() => false),
     clearSavedConfig: vi.fn(),
     exportToFile: vi.fn(),
+    exportPackingListToFile: vi.fn(),
     importFromText: vi.fn(() => true),
 }));
 vi.mock('./history.js', () => ({
@@ -37,7 +38,7 @@ const {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject,
 } = await import('./objects.js');
 const {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
 } = await import('./persistence.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
@@ -112,6 +113,7 @@ function mountFixture() {
         <button id="load-config"></button>
         <button id="reset-config"></button>
         <button id="export-config"></button>
+        <button id="export-packing-list"></button>
         <input type="file" id="import-config-file">
         <p id="persistence-status"></p>
     `;
@@ -138,6 +140,7 @@ beforeEach(() => {
     hasSavedConfig.mockReturnValue(false);
     clearSavedConfig.mockClear();
     exportToFile.mockClear();
+    exportPackingListToFile.mockClear();
     importFromText.mockClear();
     importFromText.mockReturnValue(true);
     captureUndoPoint.mockClear();
@@ -659,6 +662,12 @@ describe('project persistence', () => {
     it('exports on click', () => {
         document.getElementById('export-config').click();
         expect(exportToFile).toHaveBeenCalled();
+    });
+
+    it('exports the packing list on click and shows a success status', () => {
+        document.getElementById('export-packing-list').click();
+        expect(exportPackingListToFile).toHaveBeenCalled();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/packliste/i);
     });
 
     it('imports the selected file, captures an undo point, and re-syncs on success', async () => {

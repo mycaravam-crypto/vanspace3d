@@ -10,7 +10,8 @@ vi.mock('./scene.js', () => ({
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const { addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT } = await import('./objects.js');
 const {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile,
+    generatePackingListText, exportPackingListToFile, importFromText,
 } = await import('./persistence.js');
 
 const STORAGE_KEY = 'vanspace3d.config.v1';
@@ -237,6 +238,69 @@ describe('loadConfig', () => {
         loadConfig();
 
         expect(objects.every((o) => o.userData.weight === DEFAULT_WEIGHT)).toBe(true);
+    });
+});
+
+describe('generatePackingListText / exportPackingListToFile', () => {
+    it('lists van dimensions and payload limit', () => {
+        vanState.length = 3.3;
+        vanState.maxHeight = 1.9;
+        vanState.maxWidth = 1.8;
+        vanState.narrowWidth = 1.3;
+        vanState.maxPayload = 400;
+
+        const text = generatePackingListText();
+
+        expect(text).toContain('330cm');
+        expect(text).toContain('190cm');
+        expect(text).toContain('180cm');
+        expect(text).toContain('130cm');
+        expect(text).toContain('400kg');
+    });
+
+    it('lists every placed object with label, size, weight and position', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        mesh.position.set(0.2, 0.16, -1.0);
+
+        const text = generatePackingListText();
+
+        expect(text).toContain('Objekte (1):');
+        expect(text).toContain('Eurobox M — 60x40x32cm — 8.0kg');
+        expect(text).toContain('20cm rechts');
+        expect(text).toContain('16cm hoch');
+    });
+
+    it('flags a locked object', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        toggleLock(mesh);
+
+        expect(generatePackingListText()).toContain('[gesperrt]');
+    });
+
+    it('does not flag an unlocked object', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        expect(generatePackingListText()).not.toContain('[gesperrt]');
+    });
+
+    it('shows total weight against the payload limit and the center of gravity', () => {
+        vanState.maxPayload = 400;
+        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M').position.set(0.3, 0.16, 0.5);
+
+        const text = generatePackingListText();
+
+        expect(text).toContain('Gesamtgewicht: 8.0kg von 400kg Zuladung');
+        expect(text).toContain('Schwerpunkt: 30cm rechts, 50cm hinten von Fahrzeugmitte');
+    });
+
+    it('omits the center-of-gravity line when nothing is placed', () => {
+        const text = generatePackingListText();
+        expect(text).toContain('Objekte (0):');
+        expect(text).not.toContain('Schwerpunkt:');
+    });
+
+    it('exportPackingListToFile triggers a Blob download without throwing', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        expect(() => exportPackingListToFile()).not.toThrow();
     });
 });
 

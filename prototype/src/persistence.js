@@ -1,5 +1,6 @@
 import { vanState, objects, DEFAULT_VAN_STATE } from './state.js';
 import { buildVanGeometry } from './van.js';
+import { computeCenterOfGravity } from './cog.js';
 import {
     addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT,
 } from './objects.js';
@@ -134,8 +135,8 @@ export function loadConfig() {
 // ==========================================
 // JSON file export/import
 // ==========================================
-export function exportToFile(filename = 'vanspace3d-project.json') {
-    const blob = new Blob([JSON.stringify(serializeState(), null, 2)], { type: 'application/json' });
+function downloadTextFile(content, filename, mimeType) {
+    const blob = new Blob([content], { type: mimeType });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -144,6 +145,58 @@ export function exportToFile(filename = 'vanspace3d-project.json') {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+export function exportToFile(filename = 'vanspace3d-project.json') {
+    downloadTextFile(JSON.stringify(serializeState(), null, 2), filename, 'application/json');
+}
+
+// ==========================================
+// Human-readable packing list (.txt) — a take-along summary for loading the
+// van, distinct from the JSON project file above (which is meant for
+// re-import, not reading).
+// ==========================================
+function formatOffsetCm(value, positiveLabel, negativeLabel) {
+    return value >= 0 ? `${Math.round(value * 100)}cm ${positiveLabel}` : `${Math.round(-value * 100)}cm ${negativeLabel}`;
+}
+
+export function generatePackingListText() {
+    const lines = [
+        'VanSpace 3D – Packliste',
+        `Erstellt: ${new Date().toLocaleString('de-DE')}`,
+        '',
+        'Fahrzeug:',
+        `  Länge: ${Math.round(vanState.length * 100)}cm, Höhe: ${Math.round(vanState.maxHeight * 100)}cm, Breite: ${Math.round(vanState.maxWidth * 100)}cm (unten: ${Math.round(vanState.narrowWidth * 100)}cm)`,
+        `  Max. Zuladung: ${vanState.maxPayload}kg`,
+        '',
+        `Objekte (${objects.length}):`,
+    ];
+
+    objects.forEach((obj, i) => {
+        const { width, height, depth } = obj.geometry.parameters;
+        const label = obj.userData.label || 'Objekt';
+        const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}cm`;
+        const weight = (obj.userData.weight ?? DEFAULT_WEIGHT).toFixed(1);
+        const lockFlag = obj.userData.locked ? ' [gesperrt]' : '';
+        const pos = obj.position;
+        const posLabel = `${formatOffsetCm(pos.x, 'rechts', 'links')}, ${formatOffsetCm(pos.z, 'hinten', 'vorne')}, ${Math.round(pos.y * 100)}cm hoch`;
+        lines.push(`  ${i + 1}. ${label} — ${dims} — ${weight}kg${lockFlag}`);
+        lines.push(`     Position: ${posLabel}`);
+    });
+
+    const cog = computeCenterOfGravity();
+    const totalWeight = cog ? cog.totalWeight : 0;
+    lines.push('');
+    lines.push(`Gesamtgewicht: ${totalWeight.toFixed(1)}kg von ${vanState.maxPayload}kg Zuladung`);
+    if (cog) {
+        lines.push(`Schwerpunkt: ${formatOffsetCm(cog.x, 'rechts', 'links')}, ${formatOffsetCm(cog.z, 'hinten', 'vorne')} von Fahrzeugmitte`);
+    }
+
+    return lines.join('\n');
+}
+
+export function exportPackingListToFile(filename = 'vanspace3d-packliste.txt') {
+    downloadTextFile(generatePackingListText(), filename, 'text/plain');
 }
 
 // Returns true if the given text was a valid project JSON and was applied.
