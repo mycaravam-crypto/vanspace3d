@@ -314,10 +314,12 @@ function renderObjectList() {
         const { width, height, depth } = obj.geometry.parameters;
         const label = escapeHtml(obj.userData.label || 'Objekt');
         const locked = !!obj.userData.locked;
+        const selected = !!obj.userData.selected;
         const weight = obj.userData.weight ?? 0;
         const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
+        const rowBorder = selected ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200';
         return `
-            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-md hover:border-blue-300 hover:bg-blue-50/50">
+            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border ${rowBorder} rounded-md hover:border-blue-300 hover:bg-blue-50/50">
                 <button type="button" data-action="select" data-idx="${i}" class="flex-1 min-w-0 text-left py-0.5">
                     <div class="text-xs font-medium text-slate-700 truncate">${label}</div>
                     <div class="text-[10px] text-slate-400 font-mono">${dims} &middot; ${weight}kg</div>

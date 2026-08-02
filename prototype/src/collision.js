@@ -39,7 +39,10 @@ export function clampToVan(obj, pos) {
     pos.z = Math.max(-limitZ, Math.min(limitZ, pos.z));
 }
 
-export function checkCollision(obj) {
+// `exclude` (optional Set) skips additional objects beyond obj itself — used
+// during a rigid group drag (controls.js's dragGroup()) so members of the
+// same moving group don't "collide" with each other.
+export function checkCollision(obj, exclude = null) {
     obj.updateMatrixWorld();
     tempBox1.setFromObject(obj);
     tempBox1.expandByScalar(-0.005); // Tiny tolerance for sliding
@@ -47,6 +50,7 @@ export function checkCollision(obj) {
     for (let i = 0; i < objects.length; i++) {
         const other = objects[i];
         if (other === obj) continue;
+        if (exclude && exclude.has(other)) continue;
 
         tempBox2.setFromObject(other);
         tempBox2.expandByScalar(-0.005);

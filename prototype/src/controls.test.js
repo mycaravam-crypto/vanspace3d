@@ -22,6 +22,10 @@ vi.mock('./objects.js', () => ({
     toggleLock: vi.fn(),
     moveVertical: vi.fn(),
     flashReject: vi.fn(),
+    // selection.js imports this from the (mocked) './objects.js' too — a
+    // no-op stub is enough since these tests assert on userData.selected
+    // directly, not the visual edge-color side effect.
+    refreshObjectAppearance: vi.fn(),
 }));
 // history.js pulls in the real persistence.js -> van.js/objects.js chain;
 // mocked here so controls.test.js stays focused on controls.js's own wiring
@@ -32,6 +36,7 @@ vi.mock('./history.js', () => ({
     redo: vi.fn(() => false),
 }));
 
+const { camera, renderer } = await import('./scene.js');
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
     rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
@@ -39,13 +44,49 @@ const {
 const { syncSlidersFromState, refreshHistoryButtons } = await import('./ui.js');
 const { captureUndoPoint, undo, redo } = await import('./history.js');
 const {
-    orbitControls, dragControls, selectObject, setCameraView,
+    isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
+} = await import('./selection.js');
+const {
+    orbitControls, dragControls, selectObject, setCameraView, projectToScreen, pointInRect,
+    handlePointerDown, handlePointerMove, handlePointerUp,
 } = await import('./controls.js');
 
 function makeTrackedBox(w = 0.6, h = 0.32, d = 0.4) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial());
     objects.push(mesh);
     return mesh;
+}
+
+// jsdom's canvas has no real layout (getBoundingClientRect is all zeros by
+// default), which would make every NDC computation divide by zero — stub a
+// plausible fixed viewport so hit-testing/marquee math is well-defined.
+const CANVAS_RECT = {
+    left: 0, top: 0, width: 800, height: 600, right: 800, bottom: 600,
+};
+renderer.domElement.getBoundingClientRect = () => CANVAS_RECT;
+
+// These call controls.js's pointer handlers directly with a plain
+// { clientX, clientY, shiftKey } object, rather than dispatching real DOM
+// pointer events on the shared canvas — dispatching for real would also
+// reach OrbitControls'/DragControls' own native listeners on that same
+// element (registered by the real, unmocked instances this file exercises
+// elsewhere via direct dispatchEvent calls), pulling in jsdom gaps that are
+// irrelevant to what's under test here (no Pointer Capture API, and
+// DragControls' internal handler assumes every object is scene-parented,
+// which these test fixtures deliberately aren't).
+function firePointerDown(x, y, opts = {}) {
+    handlePointerDown({ clientX: x, clientY: y, shiftKey: false, ...opts });
+}
+function firePointerMove(x, y) {
+    handlePointerMove({ clientX: x, clientY: y });
+}
+function firePointerUp(x, y) {
+    handlePointerUp({ clientX: x, clientY: y });
+}
+// A full click gesture (down+up at the same point, no movement).
+function click(x, y, opts = {}) {
+    firePointerDown(x, y, opts);
+    firePointerUp(x, y);
 }
 
 // activeObj inside controls.js is module-private state, and both 'hoveron'
@@ -93,6 +134,13 @@ beforeEach(() => {
     orbitControls.enabled = true;
     document.body.style.cursor = 'auto';
     document.body.innerHTML = '';
+    // camera is a shared singleton across this whole file — the setCameraView
+    // tests deliberately move it, so reset to a known pose (origin, looking
+    // down -Z) for the projectToScreen/pointer-selection tests below, which
+    // depend on a deterministic camera position/orientation.
+    camera.position.set(0, 0, 0);
+    camera.quaternion.identity();
+    camera.updateMatrixWorld(true);
 });
 
 describe('dragControls raycasting', () => {
@@ -629,5 +677,337 @@ describe('setCameraView', () => {
         const largeZ = orbitControls.object.position.z;
 
         expect(largeZ).toBeGreaterThan(smallZ);
+    });
+});
+
+describe('projectToScreen / pointInRect', () => {
+    it('projects an object directly in front of the camera to the rect center', () => {
+        const mesh = makeTrackedBox();
+        mesh.position.set(0, 0, -1); // dead ahead of the origin-positioned test camera
+        const p = projectToScreen(mesh, camera, CANVAS_RECT);
+        expect(p.x).toBeCloseTo(CANVAS_RECT.width / 2, 0);
+        expect(p.y).toBeCloseTo(CANVAS_RECT.height / 2, 0);
+    });
+
+    it('projects an object off to one side away from center, in the expected direction', () => {
+        const mesh = makeTrackedBox();
+        mesh.position.set(-0.3, 0, -1);
+        const p = projectToScreen(mesh, camera, CANVAS_RECT);
+        expect(p.x).toBeLessThan(CANVAS_RECT.width / 2);
+    });
+
+    describe('pointInRect', () => {
+        const rect = { left: 10, top: 10, width: 100, height: 50 };
+        it('is true for a point inside', () => {
+            expect(pointInRect({ x: 50, y: 30 }, rect)).toBe(true);
+        });
+        it('is true exactly on the boundary', () => {
+            expect(pointInRect({ x: 10, y: 10 }, rect)).toBe(true);
+            expect(pointInRect({ x: 110, y: 60 }, rect)).toBe(true);
+        });
+        it('is false outside the boundary', () => {
+            expect(pointInRect({ x: 9, y: 30 }, rect)).toBe(false);
+            expect(pointInRect({ x: 50, y: 61 }, rect)).toBe(false);
+        });
+    });
+});
+
+describe('pointer-driven selection (click / shift+click / marquee)', () => {
+    // All three test boxes sit dead ahead of the origin camera on x (see
+    // projectToScreen tests above), so a click at the exact rect center hits
+    // whichever one is currently in `objects` at z=-1, x=0.
+    const CENTER_X = CANVAS_RECT.width / 2;
+    const CENTER_Y = CANVAS_RECT.height / 2;
+
+    it('a plain click on an object selects only it', () => {
+        const mesh = makeTrackedBox();
+        mesh.position.set(0, 0, -1);
+
+        click(CENTER_X, CENTER_Y);
+
+        expect(isSelected(mesh)).toBe(true);
+        expect(getSelected()).toEqual([mesh]);
+        expect(refreshHistoryButtons).toHaveBeenCalled();
+    });
+
+    it('a plain click on a different object replaces the selection', () => {
+        const a = makeTrackedBox();
+        a.position.set(0, 0, -1);
+        selectOnly(a);
+
+        const b = makeTrackedBox();
+        b.position.set(0, 0, -0.5); // closer to the camera — raycaster hits this one first
+        click(CENTER_X, CENTER_Y);
+
+        expect(getSelected()).toEqual([b]);
+    });
+
+    it('a plain click on empty space clears the selection', () => {
+        const a = makeTrackedBox();
+        a.position.set(0, 0, -1);
+        selectOnly(a);
+        refreshHistoryButtons.mockClear();
+
+        click(50, 50); // far from the box's projected center
+
+        expect(getSelected()).toEqual([]);
+        expect(refreshHistoryButtons).toHaveBeenCalled();
+    });
+
+    it('a plain click on empty space with nothing selected does not call refreshHistoryButtons redundantly', () => {
+        click(50, 50);
+        expect(refreshHistoryButtons).not.toHaveBeenCalled();
+    });
+
+    it('shift+click on an unselected object adds it to the selection (accumulation)', () => {
+        const a = makeTrackedBox();
+        a.position.set(0, 0, -1);
+        const b = makeTrackedBox(0.2, 0.2, 0.2); // small + well clear of `a`'s footprint, so no raycast ambiguity
+        b.position.set(-2, 0, -1);
+        const screenB = projectToScreen(b, camera, CANVAS_RECT);
+
+        click(CENTER_X, CENTER_Y, { shiftKey: true });
+        click(screenB.x, screenB.y, { shiftKey: true });
+
+        expect(getSelected()).toEqual([a, b]);
+    });
+
+    it('shift+click on an already-selected object removes it from the selection', () => {
+        const a = makeTrackedBox();
+        a.position.set(0, 0, -1);
+        selectOnly(a);
+
+        click(CENTER_X, CENTER_Y, { shiftKey: true });
+
+        expect(getSelected()).toEqual([]);
+    });
+
+    it('a real drag gesture (movement beyond the click threshold) does not affect selection', () => {
+        const a = makeTrackedBox();
+        a.position.set(0, 0, -1);
+
+        firePointerDown(CENTER_X, CENTER_Y);
+        firePointerUp(CENTER_X + 50, CENTER_Y); // moved well past the click threshold
+
+        expect(getSelected()).toEqual([]);
+    });
+
+    describe('marquee select (shift+drag over empty space)', () => {
+        it('selects every object whose projected position falls inside the dragged rectangle, unioned with the existing selection', () => {
+            const inside1 = makeTrackedBox();
+            inside1.position.set(0, 0, -1); // projects near rect center
+            const inside2 = makeTrackedBox();
+            inside2.position.set(-0.3, 0, -1); // projects left-of-center, still on screen
+            const outside = makeTrackedBox();
+            outside.position.set(5, 0, -1); // projects far off to the right, outside the canvas
+
+            const alreadySelected = makeTrackedBox();
+            alreadySelected.position.set(0, 0, -5); // irrelevant to the marquee rect below
+            selectOnly(alreadySelected);
+
+            // Empty-space start point (bottom-right corner, away from every
+            // object's projected position) dragged up to enclose both
+            // "inside" objects but not the far-off "outside" one.
+            firePointerDown(750, 550, { shiftKey: true });
+            firePointerMove(50, 50);
+            firePointerUp(50, 50);
+
+            expect(getSelected()).toEqual(expect.arrayContaining([alreadySelected, inside1, inside2]));
+            expect(getSelected()).not.toContain(outside);
+            expect(refreshHistoryButtons).toHaveBeenCalled();
+        });
+
+        it('removes the marquee overlay element and re-enables orbit controls afterwards', () => {
+            const a = makeTrackedBox();
+            a.position.set(0, 0, -1);
+
+            firePointerDown(750, 550, { shiftKey: true });
+            expect(orbitControls.enabled).toBe(false);
+            firePointerMove(50, 50);
+            firePointerUp(50, 50);
+
+            expect(orbitControls.enabled).toBe(true);
+            expect(document.body.querySelectorAll('div').length).toBe(0);
+        });
+
+        it('does not start a marquee for a shift+drag that starts on an object (handled as a shift+click instead)', () => {
+            const a = makeTrackedBox();
+            a.position.set(0, 0, -1);
+
+            firePointerDown(CENTER_X, CENTER_Y, { shiftKey: true });
+            expect(document.body.querySelectorAll('div').length).toBe(0); // no marquee element was ever created
+            expect(orbitControls.enabled).toBe(true); // untouched — real dragging is DragControls' own concern
+
+            firePointerUp(CENTER_X, CENTER_Y);
+            expect(isSelected(a)).toBe(true); // resolves as an ordinary shift+click
+        });
+    });
+});
+
+describe('group drag (multi-selection moved as a rigid group)', () => {
+    it('moves every selected object by the same delta', () => {
+        const a = makeTrackedBox(0.2, 0.2, 0.2);
+        a.position.set(0, 0.1, -1.0);
+        const b = makeTrackedBox(0.2, 0.2, 0.2);
+        b.position.set(0.5, 0.1, -1.0);
+        addManyToSelection([a, b]);
+
+        fire('dragstart', a);
+        a.position.set(0.1, 0.1, -1.0); // primary moved +0.1 on x
+        fire('drag', a);
+
+        expect(a.position.x).toBeCloseTo(0.1);
+        expect(b.position.x).toBeCloseTo(0.6); // same +0.1 delta
+
+        fire('dragend', a);
+    });
+
+    it('excludes locked members from the move but leaves them selected', () => {
+        const a = makeTrackedBox(0.2, 0.2, 0.2);
+        a.position.set(0, 0.1, -1.0);
+        const locked = makeTrackedBox(0.2, 0.2, 0.2);
+        locked.position.set(0.5, 0.1, -1.0);
+        locked.userData.locked = true;
+        addManyToSelection([a, locked]);
+
+        fire('dragstart', a);
+        a.position.set(0.3, 0.1, -1.0);
+        fire('drag', a);
+
+        expect(a.position.x).toBeCloseTo(0.3);
+        expect(locked.position.x).toBeCloseTo(0.5); // untouched
+        expect(isSelected(locked)).toBe(true); // still selected, just not moved
+
+        fire('dragend', a);
+    });
+
+    it('rejects the whole group\'s move for this tick if any member would collide with a non-group object', () => {
+        const a = makeTrackedBox(0.2, 0.2, 0.2);
+        a.position.set(0, 0.1, -1.0);
+        const b = makeTrackedBox(0.2, 0.2, 0.2);
+        b.position.set(0.5, 0.1, -1.0);
+        addManyToSelection([a, b]);
+
+        // An obstacle sitting right where `b` would land if the group moved +0.1 on x.
+        const obstacle = makeTrackedBox(0.2, 0.2, 0.2);
+        obstacle.position.set(0.6, 0.1, -1.0);
+
+        fire('dragstart', a);
+        a.position.set(0.1, 0.1, -1.0);
+        fire('drag', a);
+
+        expect(a.position.x).toBeCloseTo(0); // whole group's tick rejected, including the primary
+        expect(b.position.x).toBeCloseTo(0.5);
+
+        fire('dragend', a);
+    });
+
+    it('does not rigidly group-drag when only one member of the selection is unlocked', () => {
+        const a = makeTrackedBox(0.2, 0.2, 0.2);
+        a.position.set(0, 0.1, -1.0);
+        const locked = makeTrackedBox(0.2, 0.2, 0.2);
+        locked.position.set(0.5, 0.1, -1.0);
+        locked.userData.locked = true;
+        addManyToSelection([a, locked]);
+
+        fire('dragstart', a); // only `a` is movable — falls back to a normal solo drag
+        a.position.set(0.12, 0.1, -1.0);
+        fire('drag', a);
+
+        expect(a.position.x).toBeCloseTo(0.10); // ordinary grid-snap behavior applied
+        fire('dragend', a);
+    });
+
+    it('applies the floor-snap to every group member on dragend', () => {
+        const a = makeTrackedBox(0.6, 0.32, 0.4);
+        a.position.set(0, 0.05, -1.0); // below floor height
+        const b = makeTrackedBox(0.6, 0.32, 0.4);
+        b.position.set(1.0, 0.05, -1.0);
+        addManyToSelection([a, b]);
+
+        fire('dragstart', a);
+        fire('dragend', a);
+
+        expect(a.position.y).toBeCloseTo(0.16);
+        expect(b.position.y).toBeCloseTo(0.16);
+    });
+});
+
+describe('keyboard shortcuts on a multi-selection', () => {
+    it('rotates every selected object individually on "r"', () => {
+        const a = makeTrackedBox();
+        const b = makeTrackedBox();
+        addManyToSelection([a, b]);
+
+        keydown('r');
+
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+        expect(rotate90).toHaveBeenCalledWith(a, true);
+        expect(rotate90).toHaveBeenCalledWith(b, true);
+        expect(refreshHistoryButtons).toHaveBeenCalled();
+    });
+
+    it('rotates the whole selection even when nothing is separately hovered', () => {
+        const a = makeTrackedBox();
+        const b = makeTrackedBox();
+        addManyToSelection([a, b]); // no fire('hoveron', ...) at all
+
+        keydown('r');
+
+        expect(rotate90).toHaveBeenCalledTimes(2);
+    });
+
+    it('deletes every selected object and clears the selection on Delete', () => {
+        const a = makeTrackedBox();
+        const b = makeTrackedBox();
+        addManyToSelection([a, b]);
+
+        keydown('Delete');
+
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+        expect(removeObject).toHaveBeenCalledWith(a);
+        expect(removeObject).toHaveBeenCalledWith(b);
+        expect(getSelected()).toEqual([]);
+        expect(refreshHistoryButtons).toHaveBeenCalled();
+    });
+
+    it('rotates a single selected object the same way whether or not it is also hovered', () => {
+        const mesh = makeTrackedBox();
+        selectOnly(mesh);
+        fire('hoveron', mesh);
+
+        keydown('r');
+
+        expect(rotate90).toHaveBeenCalledTimes(1);
+        expect(rotate90).toHaveBeenCalledWith(mesh, true);
+    });
+
+    it('rotates/deletes a single selected object even when it is not hovered (e.g. selected via marquee, mouse moved away since)', () => {
+        const mesh = makeTrackedBox();
+        selectOnly(mesh); // selected, but no fire('hoveron', ...) — activeObj stays null
+
+        keydown('r');
+        expect(rotate90).toHaveBeenCalledWith(mesh, true);
+
+        keydown('Delete');
+        expect(removeObject).toHaveBeenCalledWith(mesh);
+        expect(getSelected()).toEqual([]);
+    });
+
+    it('clears the selection on Escape without touching undo history', () => {
+        const a = makeTrackedBox();
+        const b = makeTrackedBox();
+        addManyToSelection([a, b]);
+
+        keydown('Escape');
+
+        expect(getSelected()).toEqual([]);
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(refreshHistoryButtons).toHaveBeenCalled();
+    });
+
+    it('does nothing on Escape when there is no selection', () => {
+        keydown('Escape');
+        expect(refreshHistoryButtons).not.toHaveBeenCalled();
     });
 });
