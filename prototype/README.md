@@ -32,6 +32,8 @@ Vanilla JavaScript + [Three.js](https://threejs.org/) + [Vite](https://vitejs.de
 
 **Lock flag** — protect an object from being moved, rotated, or deleted (individually, or by "Alle entfernen" / clear-all); shown with a red outline. Undo/redo and Load still fully replace the scene, including locked objects, so they stay perfectly reproducible.
 
+**Responsive layout** — on viewports below the `md` breakpoint (768px), the side panel becomes a full-width bottom sheet that starts collapsed so the 3D view stays visible, and expands/collapses via the ▲/▼ button next to the header. Touch-drag for object placement works via the same pointer-event-based `DragControls` used for mouse (it also disables touch scrolling on the canvas so a drag doesn't fight the page).
+
 ## Keyboard shortcuts
 
 Object shortcuts act on whichever object the mouse is currently hovering.
