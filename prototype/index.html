@@ -36,9 +36,12 @@
     <div id="ui-container" class="absolute top-4 left-4 bg-white/95 backdrop-blur p-5 rounded-xl shadow-2xl w-80 max-h-[95vh] overflow-y-auto border border-gray-200 z-10 flex flex-col gap-4">
 
         <!-- Header -->
-        <div>
-            <h1 class="text-xl font-bold text-gray-900 tracking-tight">VanSpace 3D</h1>
-            <p class="text-xs text-gray-500 font-medium">Prototype v7 (Vite)</p>
+        <div class="flex items-start justify-between gap-2">
+            <div>
+                <h1 class="text-xl font-bold text-gray-900 tracking-tight">VanSpace 3D</h1>
+                <p class="text-xs text-gray-500 font-medium">Prototype v7 (Vite)</p>
+            </div>
+            <button id="help-toggle" class="shrink-0 w-7 h-7 flex items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 text-sm font-bold" title="Hilfe &amp; Tastenk&uuml;rzel" aria-label="Hilfe anzeigen">?</button>
         </div>
 
         <!-- Tabs -->
@@ -205,18 +208,26 @@
             </div>
             <p id="persistence-status" class="text-[11px] text-emerald-600 font-semibold h-4"></p>
         </div>
+    </div>
 
-        <!-- Instructions / Helpers -->
-        <div class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed shadow-inner">
-            <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
-            <p class="mb-1"><span class="font-bold">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole sperren/l&ouml;schen direkt.</p>
-            <p class="mb-1"><span class="font-bold">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
-            <p class="mb-1"><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
-            <p class="mb-1"><span class="font-bold">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>.</p>
-            <p class="mb-1"><span class="font-bold">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">D</kbd>.</p>
-            <p class="mb-1"><span class="font-bold">Hoch/Runter:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↓</kbd> (5cm).</p>
-            <p class="mb-1"><span class="font-bold">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
-            <p><span class="font-bold">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Y</kbd>.</p>
+    <!-- Help modal — hidden by default, opened via the "?" button in the header (id="help-toggle") -->
+    <div id="help-modal" class="hidden fixed inset-0 z-20 items-center justify-center bg-black/40 p-4">
+        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-y-auto p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h2 class="text-sm font-bold text-slate-800">Hilfe &amp; Tastenk&uuml;rzel</h2>
+                <button id="help-close" class="text-slate-400 hover:text-slate-700 text-xl leading-none px-1" aria-label="Schlie&szlig;en">&times;</button>
+            </div>
+            <div class="text-[11px] text-slate-600 leading-relaxed">
+                <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
+                <p class="mb-1"><span class="font-bold">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole sperren/l&ouml;schen direkt.</p>
+                <p class="mb-1"><span class="font-bold">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
+                <p class="mb-1"><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
+                <p class="mb-1"><span class="font-bold">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>.</p>
+                <p class="mb-1"><span class="font-bold">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">D</kbd>.</p>
+                <p class="mb-1"><span class="font-bold">Hoch/Runter:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↓</kbd> (5cm).</p>
+                <p class="mb-1"><span class="font-bold">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
+                <p><span class="font-bold">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Y</kbd>.</p>
+            </div>
         </div>
     </div>
 

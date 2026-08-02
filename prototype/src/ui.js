@@ -38,6 +38,27 @@ function initTabs() {
     tabConfig.addEventListener('click', () => switchTab(tabConfig, tabObjects, panelConfig, panelObjects));
 }
 
+// Help modal (keyboard shortcuts + basic controls) — hidden by default,
+// opened via the "?" button in the header instead of taking up permanent
+// scroll space in the side panel.
+function initHelpModal() {
+    const toggle = document.getElementById('help-toggle');
+    const modal = document.getElementById('help-modal');
+    const closeBtn = document.getElementById('help-close');
+    if (!toggle || !modal) return;
+
+    const open = () => { modal.classList.remove('hidden'); modal.classList.add('flex'); };
+    const close = () => { modal.classList.add('hidden'); modal.classList.remove('flex'); };
+
+    toggle.addEventListener('click', open);
+    if (closeBtn) closeBtn.addEventListener('click', close);
+    // Click on the backdrop (not the dialog itself) closes it too.
+    modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) close();
+    });
+}
+
 // ==========================================
 // CONFIGURATION BINDINGS
 // ==========================================
@@ -394,6 +415,7 @@ export function initUI() {
     initHistoryButtons();
     initPersistence();
     initCameraToolbar();
+    initHelpModal();
 
     // Resume the last saved project on startup if there is one, otherwise
     // just build the van from the default vanState. Not itself an undo point
