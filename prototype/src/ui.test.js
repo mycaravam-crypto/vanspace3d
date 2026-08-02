@@ -80,12 +80,16 @@ function mountFixture() {
             <button id="cam-reset"></button>
         </div>
 
-        <input type="range" id="van-len" value="3.3">
-        <input type="range" id="van-front-len" value="1.6">
-        <input type="range" id="van-height" value="1.9">
-        <input type="range" id="van-width-max" value="1.8">
-        <input type="range" id="van-width-min" value="1.3">
-        <input type="range" id="van-arch-h" value="0.45">
+        <!-- No production min/max here on purpose (beyond a generous max, to
+             avoid jsdom's silent default-max-100 clamp on a bare <input
+             type=range>) — several tests below deliberately probe values
+             outside the real slider range to exercise clamp logic. -->
+        <input type="range" id="van-len" max="1000" value="330">
+        <input type="range" id="van-front-len" max="1000" value="160">
+        <input type="range" id="van-height" max="1000" value="190">
+        <input type="range" id="van-width-max" max="1000" value="180">
+        <input type="range" id="van-width-min" max="1000" value="130">
+        <input type="range" id="van-arch-h" max="1000" value="45">
         <input type="range" id="van-payload" min="50" max="2000" value="400">
         <span id="val-len"></span>
         <span id="val-front-len"></span>
@@ -160,55 +164,55 @@ describe('tab switching', () => {
 });
 
 describe('config sliders', () => {
-    it('updates vanState and the label text on input', () => {
+    it('updates vanState (meters) from the cm slider, and shows the cm label text on input', () => {
         const slider = document.getElementById('van-height');
-        slider.value = '2.1';
+        slider.value = '210'; // cm
         slider.dispatchEvent(new Event('input', { bubbles: true }));
 
-        expect(vanState.maxHeight).toBe(2.1);
-        expect(document.getElementById('val-height').textContent).toBe('2.10');
+        expect(vanState.maxHeight).toBe(2.1); // meters, internal
+        expect(document.getElementById('val-height').textContent).toBe('210');
         expect(buildVanGeometry).toHaveBeenCalled();
     });
 
-    it('clamps frontLength to the total length and writes the clamped value back to the slider', () => {
-        document.getElementById('van-len').value = '2.5';
+    it('clamps frontLength to the total length and writes the clamped cm value back to the slider', () => {
+        document.getElementById('van-len').value = '250'; // 2.5m
         document.getElementById('van-len').dispatchEvent(new Event('input', { bubbles: true }));
 
-        document.getElementById('van-front-len').value = '4.0'; // more than the 2.5m total
+        document.getElementById('van-front-len').value = '400'; // 4.0m, more than the 2.5m total
         document.getElementById('van-front-len').dispatchEvent(new Event('input', { bubbles: true }));
 
         expect(vanState.frontLength).toBe(2.5);
-        expect(document.getElementById('van-front-len').value).toBe('2.5');
+        expect(document.getElementById('van-front-len').value).toBe('250');
     });
 
     it('clamps narrowWidth to maxWidth', () => {
-        document.getElementById('van-width-max').value = '1.5';
+        document.getElementById('van-width-max').value = '150'; // 1.5m
         document.getElementById('van-width-max').dispatchEvent(new Event('input', { bubbles: true }));
 
-        document.getElementById('van-width-min').value = '1.7'; // more than the 1.5m max width
+        document.getElementById('van-width-min').value = '170'; // 1.7m, more than the 1.5m max width
         document.getElementById('van-width-min').dispatchEvent(new Event('input', { bubbles: true }));
 
         expect(vanState.narrowWidth).toBe(1.5);
     });
 
     it('leaves narrowWidth untouched when it is already within maxWidth', () => {
-        document.getElementById('van-width-min').value = '1.1';
+        document.getElementById('van-width-min').value = '110'; // 1.1m
         document.getElementById('van-width-min').dispatchEvent(new Event('input', { bubbles: true }));
 
         expect(vanState.narrowWidth).toBe(1.1);
     });
 
     it('clamps archHeight to maxHeight - 0.1 when the arch slider exceeds the new headroom', () => {
-        document.getElementById('van-arch-h').value = '0.8'; // its own slider max
-        document.getElementById('van-height').value = '0.85'; // leaves only 0.75m of headroom
+        document.getElementById('van-arch-h').value = '80'; // 0.8m, its own slider max
+        document.getElementById('van-height').value = '85'; // 0.85m, leaves only 0.75m of headroom
         document.getElementById('van-height').dispatchEvent(new Event('input', { bubbles: true }));
 
         expect(vanState.archHeight).toBeCloseTo(0.75); // 0.85 - 0.1
-        expect(document.getElementById('val-arch-h').textContent).toBe('0.75');
+        expect(document.getElementById('val-arch-h').textContent).toBe('75');
     });
 
     it('leaves archHeight untouched when there is enough clearance', () => {
-        document.getElementById('van-height').value = '2.4';
+        document.getElementById('van-height').value = '240'; // 2.4m
         document.getElementById('van-height').dispatchEvent(new Event('input', { bubbles: true }));
 
         expect(vanState.archHeight).toBe(0.45);
@@ -249,7 +253,7 @@ describe('vehicle preset rendering', () => {
             archHeight: preset.archHeight,
             maxPayload: preset.maxPayload,
         });
-        expect(document.getElementById('van-len').value).toBe(String(preset.length));
+        expect(document.getElementById('van-len').value).toBe(String(Math.round(preset.length * 100)));
         expect(document.getElementById('val-payload').textContent).toBe(preset.maxPayload.toFixed(0));
         expect(buildVanGeometry).toHaveBeenCalled();
     });
@@ -478,7 +482,7 @@ describe('undo/redo buttons', () => {
         document.getElementById('undo-btn').click();
 
         expect(undo).toHaveBeenCalled();
-        expect(document.getElementById('van-height').value).toBe('2.2');
+        expect(document.getElementById('van-height').value).toBe('220');
     });
 
     it('redo button click calls redo()', async () => {
@@ -538,8 +542,8 @@ describe('project persistence', () => {
 
         expect(captureUndoPoint).toHaveBeenCalled();
         expect(loadConfig).toHaveBeenCalled();
-        expect(document.getElementById('van-height').value).toBe('2.2');
-        expect(document.getElementById('val-height').textContent).toBe('2.20');
+        expect(document.getElementById('van-height').value).toBe('220');
+        expect(document.getElementById('val-height').textContent).toBe('220');
     });
 
     it('shows a "nothing saved" status and skips the undo capture when there is nothing to load', () => {
@@ -560,7 +564,7 @@ describe('project persistence', () => {
         expect(clearSavedConfig).toHaveBeenCalled();
         expect(clearAllObjects).toHaveBeenCalled();
         expect(vanState.length).toBe(DEFAULT_VAN_STATE.length);
-        expect(document.getElementById('van-len').value).toBe(String(DEFAULT_VAN_STATE.length));
+        expect(document.getElementById('van-len').value).toBe(String(Math.round(DEFAULT_VAN_STATE.length * 100)));
         expect(buildVanGeometry).toHaveBeenCalled();
     });
 

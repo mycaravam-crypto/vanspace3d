@@ -41,30 +41,37 @@ function initTabs() {
 // ==========================================
 // CONFIGURATION BINDINGS
 // ==========================================
+// vanState stores lengths in meters (matching the Three.js scene's
+// 1-unit-per-meter convention), but every length in the UI — including
+// these sliders — is shown/entered in cm, like the rest of the app
+// (library sizes, custom objects, vehicle presets). This is a display/input
+// conversion only; nothing downstream of vanState changes units.
+const CM_PER_M = 100;
+
 function updateLabels() {
-    document.getElementById('val-len').textContent = vanState.length.toFixed(2);
-    document.getElementById('val-front-len').textContent = vanState.frontLength.toFixed(2);
-    document.getElementById('val-height').textContent = vanState.maxHeight.toFixed(2);
-    document.getElementById('val-width-max').textContent = vanState.maxWidth.toFixed(2);
-    document.getElementById('val-width-min').textContent = vanState.narrowWidth.toFixed(2);
-    document.getElementById('val-arch-h').textContent = vanState.archHeight.toFixed(2);
+    document.getElementById('val-len').textContent = Math.round(vanState.length * CM_PER_M);
+    document.getElementById('val-front-len').textContent = Math.round(vanState.frontLength * CM_PER_M);
+    document.getElementById('val-height').textContent = Math.round(vanState.maxHeight * CM_PER_M);
+    document.getElementById('val-width-max').textContent = Math.round(vanState.maxWidth * CM_PER_M);
+    document.getElementById('val-width-min').textContent = Math.round(vanState.narrowWidth * CM_PER_M);
+    document.getElementById('val-arch-h').textContent = Math.round(vanState.archHeight * CM_PER_M);
     document.getElementById('val-payload').textContent = vanState.maxPayload.toFixed(0);
 }
 
 function updateConfigFromUI() {
-    vanState.length = parseFloat(document.getElementById('van-len').value);
+    vanState.length = parseFloat(document.getElementById('van-len').value) / CM_PER_M;
 
-    const rawFront = parseFloat(document.getElementById('van-front-len').value);
+    const rawFront = parseFloat(document.getElementById('van-front-len').value) / CM_PER_M;
     vanState.frontLength = Math.min(rawFront, vanState.length);
-    document.getElementById('van-front-len').value = vanState.frontLength; // Update slider if clamped
+    document.getElementById('van-front-len').value = vanState.frontLength * CM_PER_M; // Update slider if clamped
 
-    vanState.maxHeight = parseFloat(document.getElementById('van-height').value);
-    vanState.maxWidth = parseFloat(document.getElementById('van-width-max').value);
+    vanState.maxHeight = parseFloat(document.getElementById('van-height').value) / CM_PER_M;
+    vanState.maxWidth = parseFloat(document.getElementById('van-width-max').value) / CM_PER_M;
 
-    const rawMinW = parseFloat(document.getElementById('van-width-min').value);
+    const rawMinW = parseFloat(document.getElementById('van-width-min').value) / CM_PER_M;
     vanState.narrowWidth = Math.min(rawMinW, vanState.maxWidth);
 
-    const rawArchH = parseFloat(document.getElementById('van-arch-h').value);
+    const rawArchH = parseFloat(document.getElementById('van-arch-h').value) / CM_PER_M;
     vanState.archHeight = Math.min(rawArchH, vanState.maxHeight - 0.1);
 
     vanState.maxPayload = parseFloat(document.getElementById('van-payload').value);
@@ -130,12 +137,12 @@ function initConfigSliders() {
 // anything that changes vanState from outside the slider inputs themselves
 // (loading a saved config, undo/redo, resetting to defaults).
 export function syncSlidersFromState() {
-    document.getElementById('van-len').value = vanState.length;
-    document.getElementById('van-front-len').value = vanState.frontLength;
-    document.getElementById('van-height').value = vanState.maxHeight;
-    document.getElementById('van-width-max').value = vanState.maxWidth;
-    document.getElementById('van-width-min').value = vanState.narrowWidth;
-    document.getElementById('van-arch-h').value = vanState.archHeight;
+    document.getElementById('van-len').value = Math.round(vanState.length * CM_PER_M);
+    document.getElementById('van-front-len').value = Math.round(vanState.frontLength * CM_PER_M);
+    document.getElementById('van-height').value = Math.round(vanState.maxHeight * CM_PER_M);
+    document.getElementById('van-width-max').value = Math.round(vanState.maxWidth * CM_PER_M);
+    document.getElementById('van-width-min').value = Math.round(vanState.narrowWidth * CM_PER_M);
+    document.getElementById('van-arch-h').value = Math.round(vanState.archHeight * CM_PER_M);
     document.getElementById('van-payload').value = vanState.maxPayload;
     updateLabels();
 }
