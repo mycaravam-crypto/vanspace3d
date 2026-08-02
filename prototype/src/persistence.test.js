@@ -12,6 +12,7 @@ const { addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT } = await import('./
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile,
     generatePackingListText, exportPackingListToFile, importFromText,
+    listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
 
 const STORAGE_KEY = 'vanspace3d.config.v1';
@@ -344,6 +345,116 @@ describe('exportToFile / importFromText', () => {
     });
 });
 
+describe('named projects', () => {
+    it('has none saved initially', () => {
+        expect(listProjects()).toEqual([]);
+    });
+
+    it('rejects saving with a blank/whitespace-only name', () => {
+        expect(saveNamedProject('')).toBe(false);
+        expect(saveNamedProject('   ')).toBe(false);
+        expect(listProjects()).toEqual([]);
+    });
+
+    it('saves a named project and lists it with a timestamp', () => {
+        expect(saveNamedProject('Umzug')).toBe(true);
+        const list = listProjects();
+        expect(list).toHaveLength(1);
+        expect(list[0].name).toBe('Umzug');
+        expect(typeof list[0].savedAt).toBe('number');
+    });
+
+    it('trims the given name', () => {
+        saveNamedProject('  Umzug  ');
+        expect(listProjects()[0].name).toBe('Umzug');
+    });
+
+    it('saving again under the same name overwrites that project (same id, updated content)', () => {
+        saveNamedProject('Umzug');
+        const firstId = listProjects()[0].id;
+
+        addBox(0.6, 0.32, 0.4, 0x64748b); // change live state before re-saving
+        saveNamedProject('Umzug');
+
+        const list = listProjects();
+        expect(list).toHaveLength(1); // still one entry, not two
+        expect(list[0].id).toBe(firstId);
+    });
+
+    it('saving under a different name creates a second, independent project', () => {
+        saveNamedProject('Umzug');
+        saveNamedProject('Camping');
+        expect(listProjects()).toHaveLength(2);
+    });
+
+    it('round-trips van state and objects through save/clear/load', () => {
+        vanState.length = 4.1;
+        addBox(0.6, 0.32, 0.4, 0x64748b, 9, 'Werkzeugkiste').position.set(0.2, 0.16, -1.0);
+        saveNamedProject('Umzug');
+        const { id } = listProjects()[0];
+
+        clearAllObjects();
+        Object.assign(vanState, DEFAULT_VAN_STATE);
+
+        expect(loadNamedProject(id)).toBe(true);
+        expect(vanState.length).toBe(4.1);
+        expect(objects).toHaveLength(1);
+        expect(objects[0].userData.label).toBe('Werkzeugkiste');
+        expect(objects[0].position.x).toBeCloseTo(0.2);
+    });
+
+    it('loadNamedProject returns false for an unknown id', () => {
+        expect(loadNamedProject('nope')).toBe(false);
+    });
+
+    it('deletes a project by id', () => {
+        saveNamedProject('Umzug');
+        const { id } = listProjects()[0];
+
+        expect(deleteNamedProject(id)).toBe(true);
+        expect(listProjects()).toEqual([]);
+    });
+
+    it('deleteNamedProject returns false (no-op) for an unknown id', () => {
+        saveNamedProject('Umzug');
+        expect(deleteNamedProject('nope')).toBe(false);
+        expect(listProjects()).toHaveLength(1);
+    });
+
+    it('renames a project without touching its content', () => {
+        vanState.length = 4.4;
+        saveNamedProject('Umzug');
+        const { id } = listProjects()[0];
+
+        expect(renameNamedProject(id, 'Umzug (final)')).toBe(true);
+        expect(listProjects()[0].name).toBe('Umzug (final)');
+
+        Object.assign(vanState, DEFAULT_VAN_STATE);
+        loadNamedProject(id);
+        expect(vanState.length).toBe(4.4);
+    });
+
+    it('rejects renaming to a blank name', () => {
+        saveNamedProject('Umzug');
+        const { id } = listProjects()[0];
+        expect(renameNamedProject(id, '   ')).toBe(false);
+        expect(listProjects()[0].name).toBe('Umzug');
+    });
+
+    it('renameNamedProject returns false for an unknown id', () => {
+        expect(renameNamedProject('nope', 'Neu')).toBe(false);
+    });
+
+    it('lists most-recently-saved first', async () => {
+        saveNamedProject('Erstes');
+        // Ensure a distinct timestamp even on a fast test runner.
+        await new Promise((resolve) => setTimeout(resolve, 2));
+        saveNamedProject('Zweites');
+
+        expect(listProjects().map((p) => p.name)).toEqual(['Zweites', 'Erstes']);
+    });
+});
+
 describe('storage unavailable (e.g. Safari private mode / quota exceeded)', () => {
     it('saveConfig returns false instead of throwing when setItem fails', () => {
         const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -369,6 +480,24 @@ describe('storage unavailable (e.g. Safari private mode / quota exceeded)', () =
         });
         expect(() => hasSavedConfig()).not.toThrow();
         expect(hasSavedConfig()).toBe(false);
+        spy.mockRestore();
+    });
+
+    it('saveNamedProject returns false instead of throwing when setItem fails', () => {
+        const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('QuotaExceededError');
+        });
+        expect(() => saveNamedProject('Umzug')).not.toThrow();
+        expect(saveNamedProject('Umzug')).toBe(false);
+        spy.mockRestore();
+    });
+
+    it('listProjects returns an empty list instead of throwing when getItem fails', () => {
+        const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('SecurityError');
+        });
+        expect(() => listProjects()).not.toThrow();
+        expect(listProjects()).toEqual([]);
         spy.mockRestore();
     });
 });

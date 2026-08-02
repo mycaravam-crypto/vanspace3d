@@ -19,6 +19,11 @@ vi.mock('./persistence.js', () => ({
     exportToFile: vi.fn(),
     exportPackingListToFile: vi.fn(),
     importFromText: vi.fn(() => true),
+    listProjects: vi.fn(() => []),
+    saveNamedProject: vi.fn(() => true),
+    loadNamedProject: vi.fn(() => true),
+    deleteNamedProject: vi.fn(() => true),
+    renameNamedProject: vi.fn(() => true),
 }));
 vi.mock('./history.js', () => ({
     captureUndoPoint: vi.fn(),
@@ -39,6 +44,7 @@ const {
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
+    listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
@@ -116,6 +122,9 @@ function mountFixture() {
         <button id="export-packing-list"></button>
         <input type="file" id="import-config-file">
         <p id="persistence-status"></p>
+
+        <button id="save-as-project"></button>
+        <div id="project-list"></div>
     `;
 }
 
@@ -143,6 +152,16 @@ beforeEach(() => {
     exportPackingListToFile.mockClear();
     importFromText.mockClear();
     importFromText.mockReturnValue(true);
+    listProjects.mockClear();
+    listProjects.mockReturnValue([]);
+    saveNamedProject.mockClear();
+    saveNamedProject.mockReturnValue(true);
+    loadNamedProject.mockClear();
+    loadNamedProject.mockReturnValue(true);
+    deleteNamedProject.mockClear();
+    deleteNamedProject.mockReturnValue(true);
+    renameNamedProject.mockClear();
+    renameNamedProject.mockReturnValue(true);
     captureUndoPoint.mockClear();
     canUndo.mockClear();
     canUndo.mockReturnValue(false);
@@ -697,5 +716,119 @@ describe('project persistence', () => {
         await vi.waitFor(() => expect(importFromText).toHaveBeenCalled());
 
         expect(document.getElementById('persistence-status').textContent).toMatch(/fehlgeschlagen/i);
+    });
+});
+
+describe('named projects', () => {
+    it('shows a placeholder when none are saved', () => {
+        expect(document.getElementById('project-list').textContent).toMatch(/keine gespeicherten/i);
+    });
+
+    it('renders one row per saved project with its name', () => {
+        listProjects.mockReturnValue([
+            { id: 'a', name: 'Umzug', savedAt: Date.now() },
+            { id: 'b', name: 'Camping', savedAt: Date.now() },
+        ]);
+        initUI(); // re-render the project list with the mocked entries present
+
+        const rows = document.querySelectorAll('#project-list button[data-action="load-project"]');
+        expect(rows).toHaveLength(2);
+        expect(document.getElementById('project-list').textContent).toContain('Umzug');
+        expect(document.getElementById('project-list').textContent).toContain('Camping');
+    });
+
+    it('save-as prompts for a name and calls saveNamedProject', () => {
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Umzug');
+        document.getElementById('save-as-project').click();
+
+        expect(promptSpy).toHaveBeenCalled();
+        expect(saveNamedProject).toHaveBeenCalledWith('Umzug');
+        promptSpy.mockRestore();
+    });
+
+    it('save-as does nothing when the prompt is cancelled', () => {
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+        document.getElementById('save-as-project').click();
+
+        expect(saveNamedProject).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
+    });
+
+    it('shows a failure status when saveNamedProject rejects the name', () => {
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Umzug');
+        saveNamedProject.mockReturnValue(false);
+
+        document.getElementById('save-as-project').click();
+
+        expect(document.getElementById('persistence-status').textContent).toMatch(/fehlgeschlagen/i);
+        promptSpy.mockRestore();
+    });
+
+    it('loading a project captures an undo point, re-syncs sliders, and shows success', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        initUI(); // re-render the project list with the mocked entry present
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#project-list button[data-action="load-project"]').click();
+
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(loadNamedProject).toHaveBeenCalledWith('abc');
+        expect(document.getElementById('persistence-status').textContent).toMatch(/geladen/i);
+    });
+
+    it('shows a failure status when loading a project fails', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        loadNamedProject.mockReturnValue(false);
+        initUI();
+
+        document.querySelector('#project-list button[data-action="load-project"]').click();
+
+        expect(document.getElementById('persistence-status').textContent).toMatch(/fehlgeschlagen/i);
+    });
+
+    it('renaming a project prompts pre-filled with the current name and calls renameNamedProject', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        initUI();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Umzug (final)');
+
+        document.querySelector('#project-list button[data-action="rename-project"]').click();
+
+        expect(promptSpy).toHaveBeenCalledWith(expect.any(String), 'Umzug');
+        expect(renameNamedProject).toHaveBeenCalledWith('abc', 'Umzug (final)');
+        promptSpy.mockRestore();
+    });
+
+    it('rename does nothing when the prompt is cancelled', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        initUI();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+
+        document.querySelector('#project-list button[data-action="rename-project"]').click();
+
+        expect(renameNamedProject).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
+    });
+
+    it('deleting a project asks for confirmation, then calls deleteNamedProject', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        initUI();
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+        document.querySelector('#project-list button[data-action="delete-project"]').click();
+
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(deleteNamedProject).toHaveBeenCalledWith('abc');
+        confirmSpy.mockRestore();
+    });
+
+    it('delete does nothing when the confirmation is declined', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        initUI();
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+        document.querySelector('#project-list button[data-action="delete-project"]').click();
+
+        expect(deleteNamedProject).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
     });
 });
