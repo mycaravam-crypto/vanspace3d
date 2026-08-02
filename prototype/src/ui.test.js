@@ -41,6 +41,7 @@ const {
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
 const { STANDARD_LIBRARY } = await import('./library.js');
+const { VEHICLE_PRESETS } = await import('./vehicles.js');
 const { initUI, isSnapEnabled, refreshHistoryButtons } = await import('./ui.js');
 
 // Minimal DOM fixture mirroring the ids/attributes ui.js reads/writes.
@@ -55,6 +56,7 @@ function mountFixture() {
         <div id="panel-config" class="hidden"></div>
 
         <div id="standard-library-list"></div>
+        <div id="vehicle-preset-list"></div>
 
         <input id="custom-name" value="">
         <input id="custom-w" value="50">
@@ -225,6 +227,37 @@ describe('config sliders', () => {
 
         expect(vanState.maxPayload).toBe(650);
         expect(document.getElementById('val-payload').textContent).toBe('650');
+    });
+});
+
+describe('vehicle preset rendering', () => {
+    it('renders one button per preset', () => {
+        const buttons = document.querySelectorAll('#vehicle-preset-list button');
+        expect(buttons).toHaveLength(VEHICLE_PRESETS.length);
+    });
+
+    it('applying a preset overwrites the entire vanState and re-syncs the sliders', () => {
+        const preset = VEHICLE_PRESETS[0];
+        document.querySelector(`#vehicle-preset-list button[data-preset-id="${preset.id}"]`).click();
+
+        expect(vanState).toMatchObject({
+            length: preset.length,
+            frontLength: preset.frontLength,
+            maxHeight: preset.maxHeight,
+            maxWidth: preset.maxWidth,
+            narrowWidth: preset.narrowWidth,
+            archHeight: preset.archHeight,
+            maxPayload: preset.maxPayload,
+        });
+        expect(document.getElementById('van-len').value).toBe(String(preset.length));
+        expect(document.getElementById('val-payload').textContent).toBe(preset.maxPayload.toFixed(0));
+        expect(buildVanGeometry).toHaveBeenCalled();
+    });
+
+    it('captures a single undo point when applying a preset', () => {
+        captureUndoPoint.mockClear();
+        document.querySelector(`#vehicle-preset-list button[data-preset-id="${VEHICLE_PRESETS[0].id}"]`).click();
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
     });
 });
 

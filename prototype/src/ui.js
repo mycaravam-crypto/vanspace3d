@@ -4,6 +4,7 @@ import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, flashReject, DEFAULT_WEIGHT,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
+import { VEHICLE_PRESETS } from './vehicles.js';
 import {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
 } from './persistence.js';
@@ -75,6 +76,40 @@ function updateConfigFromUI() {
 const CONFIG_SLIDER_IDS = [
     'van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h', 'van-payload',
 ];
+
+// Renders one button per VEHICLE_PRESETS entry; clicking one overwrites the
+// whole vanState (all dimensions + maxPayload) in one gesture, same pattern
+// as a standard-library object add (one undo point, then a full re-sync).
+function initVehiclePresets() {
+    const container = document.getElementById('vehicle-preset-list');
+    if (!container) return;
+
+    container.innerHTML = VEHICLE_PRESETS.map((preset) => `
+        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-slate-400 group" data-preset-id="${preset.id}">
+            <span class="text-sm font-medium text-slate-700 group-hover:text-blue-600">${preset.label}</span>
+            <span class="text-[11px] text-slate-400 font-mono">${(preset.length * 100).toFixed(0)}x${(preset.maxWidth * 100).toFixed(0)}x${(preset.maxHeight * 100).toFixed(0)}</span>
+        </button>
+    `).join('');
+
+    container.querySelectorAll('button[data-preset-id]').forEach((btn) => {
+        const preset = VEHICLE_PRESETS.find((p) => p.id === btn.dataset.presetId);
+        btn.addEventListener('click', () => {
+            captureUndoPoint();
+            Object.assign(vanState, {
+                length: preset.length,
+                frontLength: preset.frontLength,
+                maxHeight: preset.maxHeight,
+                maxWidth: preset.maxWidth,
+                narrowWidth: preset.narrowWidth,
+                archHeight: preset.archHeight,
+                maxPayload: preset.maxPayload,
+            });
+            syncSlidersFromState();
+            buildVanGeometry();
+            refreshHistoryButtons();
+        });
+    });
+}
 
 function initConfigSliders() {
     CONFIG_SLIDER_IDS.forEach((id) => {
@@ -346,6 +381,7 @@ function initPersistence() {
 
 export function initUI() {
     initTabs();
+    initVehiclePresets();
     initConfigSliders();
     initObjectPanel();
     initHistoryButtons();
