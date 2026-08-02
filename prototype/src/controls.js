@@ -3,7 +3,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DragControls } from 'three/addons/controls/DragControls.js';
 import { camera, renderer } from './scene.js';
 import { vanState, objects } from './state.js';
-import { clampToVan, checkCollision } from './collision.js';
+import { clampToVan, checkCollision, findFaceSnap } from './collision.js';
 import {
     rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
 } from './objects.js';
@@ -109,11 +109,18 @@ dragControls.addEventListener('drag', (event) => {
     let targetY = obj.position.y;
     let targetZ = obj.position.z;
 
-    // Optional Grid Snapping (0.05m = 5cm)
+    // Optional snapping: prefer catching a neighboring object's adjacent
+    // face (stacking on top, or side-by-side) over the plain 5cm grid, since
+    // it's what you actually want when nudging boxes together — fall back
+    // to the grid when no neighbor is close enough on that axis.
     if (doSnap) {
-        targetX = Math.round(targetX / 0.05) * 0.05;
-        targetY = Math.round(targetY / 0.05) * 0.05;
-        targetZ = Math.round(targetZ / 0.05) * 0.05;
+        const faceSnapX = findFaceSnap(obj, 'x', targetX);
+        const faceSnapY = findFaceSnap(obj, 'y', targetY);
+        const faceSnapZ = findFaceSnap(obj, 'z', targetZ);
+
+        targetX = faceSnapX !== null ? faceSnapX : Math.round(targetX / 0.05) * 0.05;
+        targetY = faceSnapY !== null ? faceSnapY : Math.round(targetY / 0.05) * 0.05;
+        targetZ = faceSnapZ !== null ? faceSnapZ : Math.round(targetZ / 0.05) * 0.05;
     }
 
     const p = lastValidPos.clone();

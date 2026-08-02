@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import * as THREE from 'three';
 import { vanState, objects } from './state.js';
-import { clampToVan, checkCollision } from './collision.js';
+import {
+    clampToVan, checkCollision, findFaceSnap, FACE_SNAP_TOLERANCE,
+} from './collision.js';
 
 function makeBox(w, h, d) {
     return new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial());
@@ -146,5 +148,110 @@ describe('checkCollision', () => {
         a.position.set(0, 0.16, 0);
         // objects list intentionally left empty — nothing to collide against.
         expect(checkCollision(a)).toBe(false);
+    });
+});
+
+describe('findFaceSnap', () => {
+    // A Eurobox-sized "floor" box other objects can stack on: 60x32x40 (WxHxD),
+    // sitting flat on the ground (bottom at y=0) with its footprint centered
+    // at the origin, i.e. spanning x:[-0.3,0.3], y:[0,0.32], z:[-0.2,0.2].
+    function makeFloorBox() {
+        const box = makeBox(0.6, 0.32, 0.4);
+        box.position.set(0, 0.16, 0);
+        objects.push(box);
+        return box;
+    }
+
+    describe('y axis (stacking)', () => {
+        it('snaps onto the top of a neighbor with full footprint overlap', () => {
+            const base = makeFloorBox();
+            const top = makeBox(0.6, 0.32, 0.4);
+            top.position.set(0, 0, 0); // same footprint, hovering near the top face
+            objects.push(top);
+
+            // Proposed y is a couple cm off from a perfect stack (base top = 0.32).
+            const snapped = findFaceSnap(top, 'y', 0.32 + 0.16 + 0.02);
+            expect(snapped).toBeCloseTo(base.position.y + 0.32 / 2 + 0.32 / 2); // 0.48
+        });
+
+        it('snaps underneath a neighbor when approaching from below', () => {
+            const base = makeFloorBox(); // top at 0.32
+            const below = makeBox(0.6, 0.2, 0.4);
+            below.position.set(0, 0, 0);
+            objects.push(below);
+
+            const proposed = base.position.y - 0.32 / 2 - 0.2 / 2 + 0.015; // close to snapping underneath
+            const snapped = findFaceSnap(below, 'y', proposed);
+            expect(snapped).toBeCloseTo(base.position.y - 0.32 / 2 - 0.2 / 2);
+        });
+
+        it('does not snap when outside the tolerance', () => {
+            makeFloorBox(); // top at 0.32
+            const top = makeBox(0.6, 0.32, 0.4);
+            top.position.set(0, 0, 0);
+            objects.push(top);
+
+            const farOff = 0.32 + 0.16 + FACE_SNAP_TOLERANCE + 0.02;
+            expect(findFaceSnap(top, 'y', farOff)).toBeNull();
+        });
+
+        it('does not snap when the footprints barely touch at a corner (insufficient overlap)', () => {
+            const base = makeFloorBox(); // spans x:[-0.3,0.3], z:[-0.2,0.2]
+            const top = makeBox(0.6, 0.32, 0.4);
+            // Shifted almost entirely off base's footprint on x — only a sliver overlaps.
+            top.position.set(0.59, 0, 0);
+            objects.push(top);
+
+            expect(findFaceSnap(top, 'y', 0.48)).toBeNull();
+        });
+
+        it('picks the closest candidate when a stack-on-top and a stack-underneath are both in range', () => {
+            const base = makeFloorBox(); // top at 0.32, bottom at 0
+            const mover = makeBox(0.2, 0.2, 0.2);
+            mover.position.set(0, 0, 0);
+            objects.push(mover);
+
+            // Closer to stacking on top (0.32 + 0.1 = 0.42) than underneath (0 - 0.1 = -0.1).
+            const snapped = findFaceSnap(mover, 'y', 0.40);
+            expect(snapped).toBeCloseTo(0.42);
+        });
+    });
+
+    describe('x/z axes (side-by-side)', () => {
+        it('snaps to the right-hand face of a neighbor on x when footprints overlap in y/z', () => {
+            makeFloorBox(); // right face at x=0.3, spans y:[0,0.32], z:[-0.2,0.2]
+            const neighbor = makeBox(0.6, 0.32, 0.4);
+            neighbor.position.set(0.9, 0.16, 0); // same height/depth, roughly beside it
+            objects.push(neighbor);
+
+            const snapped = findFaceSnap(neighbor, 'x', 0.3 + 0.6 / 2 + 0.02);
+            expect(snapped).toBeCloseTo(0.3 + 0.6 / 2); // 0.6
+        });
+
+        it('snaps to the front/back face of a neighbor on z when footprints overlap in x/y', () => {
+            makeFloorBox(); // back face at z=0.2, spans x:[-0.3,0.3], y:[0,0.32]
+            const neighbor = makeBox(0.6, 0.32, 0.4);
+            neighbor.position.set(0, 0.16, 0.8);
+            objects.push(neighbor);
+
+            const snapped = findFaceSnap(neighbor, 'z', 0.2 + 0.4 / 2 - 0.015);
+            expect(snapped).toBeCloseTo(0.2 + 0.4 / 2); // 0.4
+        });
+
+        it('does not snap on x when there is no y/z overlap (different shelf entirely)', () => {
+            makeFloorBox();
+            const farUp = makeBox(0.6, 0.32, 0.4);
+            farUp.position.set(0.6, 2.0, 0); // way above — no y overlap with base
+            objects.push(farUp);
+
+            expect(findFaceSnap(farUp, 'x', 0.3 + 0.3 + 0.01)).toBeNull();
+        });
+    });
+
+    it('ignores the object itself when scanning for neighbors', () => {
+        const solo = makeBox(0.6, 0.32, 0.4);
+        solo.position.set(0, 0.16, 0);
+        objects.push(solo);
+        expect(findFaceSnap(solo, 'y', 0.5)).toBeNull();
     });
 });
