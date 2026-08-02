@@ -88,6 +88,22 @@ describe('addBox', () => {
         const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
         expect(mesh.userData.locked).toBe(false);
     });
+
+    it('stores the given label on userData', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Werkzeugkiste');
+        expect(mesh.userData.label).toBe('Werkzeugkiste');
+    });
+
+    it('trims a label with surrounding whitespace', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 5, '  Werkzeugkiste  ');
+        expect(mesh.userData.label).toBe('Werkzeugkiste');
+    });
+
+    it('falls back to a generic "Objekt" label when none, blank, or non-string is given', () => {
+        expect(addBox(0.6, 0.32, 0.4, 0x64748b).userData.label).toBe('Objekt');
+        expect(addBox(0.6, 0.32, 0.4, 0x64748b, 5, '   ').userData.label).toBe('Objekt');
+        expect(addBox(0.6, 0.32, 0.4, 0x64748b, 5, 42).userData.label).toBe('Objekt');
+    });
 });
 
 describe('clearAllObjects', () => {
@@ -277,6 +293,12 @@ describe('duplicateObject', () => {
         expect(copy.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
         expect(copy.material.color.getHex()).toBe(0x64748b);
         expect(copy.userData.weight).toBe(9);
+    });
+
+    it('carries the label over to the copy', () => {
+        const original = addBox(0.6, 0.32, 0.4, 0x64748b, 9, 'Werkzeugkiste');
+        const copy = duplicateObject(original);
+        expect(copy.userData.label).toBe('Werkzeugkiste');
     });
 
     it('offsets the copy from the original instead of stacking exactly on top', () => {

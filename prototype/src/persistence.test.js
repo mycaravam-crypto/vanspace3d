@@ -150,6 +150,33 @@ describe('loadConfig', () => {
         expect(objects[0].userData.weight).toBe(17.5);
     });
 
+    it('round-trips the label of each object', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 17.5, 'Werkzeugkiste');
+        saveConfig();
+        clearAllObjects();
+
+        loadConfig();
+
+        expect(objects[0].userData.label).toBe('Werkzeugkiste');
+    });
+
+    it('falls back to the generic "Objekt" label for a missing or invalid label field (old saves without it)', () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: 1,
+            vanState: { ...DEFAULT_VAN_STATE },
+            objects: [
+                { w: 0.6, h: 0.32, d: 0.4, color: 0x64748b, position: { x: 0, y: 0.16, z: 0 } }, // no label field
+                {
+                    w: 0.3, h: 0.2, d: 0.3, color: 0x10b981, label: '   ', position: { x: 1, y: 0.1, z: 0 },
+                }, // blank label
+            ],
+        }));
+
+        loadConfig();
+
+        expect(objects.every((o) => o.userData.label === 'Objekt')).toBe(true);
+    });
+
     it('round-trips the locked flag', () => {
         const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
         toggleLock(mesh);

@@ -1,13 +1,14 @@
-import { vanState, DEFAULT_VAN_STATE } from './state.js';
+import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
-    addBox, clearAllObjects, clearUnlockedObjects, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, flashReject, DEFAULT_WEIGHT,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
 } from './persistence.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
+import { selectObject, setCameraView } from './controls.js';
 
 // ==========================================
 // UI LOGIC
@@ -108,7 +109,10 @@ function renderStandardLibrary() {
     container.innerHTML = STANDARD_LIBRARY.map((item) => `
         <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-${item.accent}-500 group" data-lib-id="${item.id}">
             <span class="text-sm font-medium text-slate-700 group-hover:text-${item.accent}-600">${item.label}</span>
-            <span class="text-[11px] text-slate-400 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
+            <span class="text-right">
+                <span class="block text-[11px] text-slate-400 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
+                <span class="block text-[10px] text-slate-400 font-mono">${item.weight}kg</span>
+            </span>
         </button>
     `).join('');
 
@@ -116,7 +120,7 @@ function renderStandardLibrary() {
         const item = STANDARD_LIBRARY.find((i) => i.id === btn.dataset.libId);
         btn.addEventListener('click', () => {
             captureUndoPoint();
-            addBox(item.w, item.h, item.d, item.color, item.weight);
+            addBox(item.w, item.h, item.d, item.color, item.weight, item.label);
             refreshHistoryButtons();
         });
     });
@@ -132,6 +136,8 @@ function initObjectPanel() {
         const c = document.getElementById('custom-c').value;
         const rawWeight = parseFloat(document.getElementById('custom-weight').value);
         const weight = (Number.isFinite(rawWeight) && rawWeight > 0) ? rawWeight : DEFAULT_WEIGHT;
+        const rawName = document.getElementById('custom-name').value.trim();
+        const label = rawName || 'Eigenes Objekt';
 
         // Guard against NaN (empty/invalid input), non-positive, and absurdly
         // large values (e.g. a stray extra digit) that would silently fail or
@@ -139,7 +145,7 @@ function initObjectPanel() {
         const isSane = (v) => Number.isFinite(v) && v > 0 && v <= 10;
         if (isSane(w) && isSane(h) && isSane(d)) {
             captureUndoPoint();
-            addBox(w, h, d, c, weight);
+            addBox(w, h, d, c, weight, label);
             refreshHistoryButtons();
         } else {
             alert('Bitte gültige Maße zwischen 1 und 1000 cm eingeben.');
@@ -154,6 +160,87 @@ function initObjectPanel() {
 }
 
 // ==========================================
+// OBJECT LIST (inspector)
+// ==========================================
+function escapeHtml(str) {
+    return str.replace(/[&<>"']/g, (c) => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    }[c]));
+}
+
+const ICON_LOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>';
+const ICON_UNLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.5"/></svg>';
+const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7"/></svg>';
+
+// Renders the list of placed objects (label, size, weight, lock state) so an
+// object can be found and selected/locked/deleted without hunting for it in
+// the 3D view. Kept in sync by calling this from refreshHistoryButtons() —
+// every mutation site in the app already calls that after changing `objects`.
+function renderObjectList() {
+    const container = document.getElementById('object-list');
+    if (!container) return;
+
+    if (objects.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-400 italic px-1 py-1">Keine Objekte platziert.</p>';
+        return;
+    }
+
+    container.innerHTML = objects.map((obj, i) => {
+        const { width, height, depth } = obj.geometry.parameters;
+        const label = escapeHtml(obj.userData.label || 'Objekt');
+        const locked = !!obj.userData.locked;
+        const weight = obj.userData.weight ?? 0;
+        const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
+        return `
+            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-md hover:border-blue-300 hover:bg-blue-50/50">
+                <button type="button" data-action="select" data-idx="${i}" class="flex-1 min-w-0 text-left py-0.5">
+                    <div class="text-xs font-medium text-slate-700 truncate">${label}</div>
+                    <div class="text-[10px] text-slate-400 font-mono">${dims} &middot; ${weight}kg</div>
+                </button>
+                <button type="button" data-action="lock" data-idx="${i}" title="Sperren/Entsperren (L)" class="p-1.5 rounded ${locked ? 'text-red-500 hover:text-red-600' : 'text-slate-300 hover:text-slate-500'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
+                <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
+            </div>`;
+    }).join('');
+
+    container.querySelectorAll('button[data-action]').forEach((btn) => {
+        const idx = parseInt(btn.dataset.idx, 10);
+        const obj = objects[idx];
+        if (!obj) return;
+
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const action = btn.dataset.action;
+            if (action === 'select') {
+                selectObject(obj);
+            } else if (action === 'lock') {
+                captureUndoPoint();
+                toggleLock(obj);
+                refreshHistoryButtons();
+            } else if (action === 'delete') {
+                if (obj.userData.locked) { flashReject(obj); return; }
+                captureUndoPoint();
+                removeObject(obj);
+                refreshHistoryButtons();
+            }
+        });
+    });
+}
+
+// ==========================================
+// CAMERA VIEW TOOLBAR
+// ==========================================
+const CAMERA_VIEW_BUTTON_IDS = {
+    'cam-top': 'top', 'cam-front': 'front', 'cam-side': 'side', 'cam-reset': 'iso',
+};
+
+function initCameraToolbar() {
+    Object.entries(CAMERA_VIEW_BUTTON_IDS).forEach(([id, view]) => {
+        const btn = document.getElementById(id);
+        if (btn) btn.addEventListener('click', () => setCameraView(view));
+    });
+}
+
+// ==========================================
 // UNDO / REDO
 // ==========================================
 export function refreshHistoryButtons() {
@@ -161,6 +248,7 @@ export function refreshHistoryButtons() {
     const redoBtn = document.getElementById('redo-btn');
     if (undoBtn) undoBtn.disabled = !canUndo();
     if (redoBtn) redoBtn.disabled = !canRedo();
+    renderObjectList();
 }
 
 function initHistoryButtons() {
@@ -256,6 +344,7 @@ export function initUI() {
     initObjectPanel();
     initHistoryButtons();
     initPersistence();
+    initCameraToolbar();
 
     // Resume the last saved project on startup if there is one, otherwise
     // just build the van from the default vanState. Not itself an undo point

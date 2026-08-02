@@ -47,7 +47,7 @@ function updateLockVisual(obj) {
     }
 }
 
-export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT) {
+export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null) {
     const geo = new THREE.BoxGeometry(w, h, d);
     const mat = new THREE.MeshStandardMaterial({
         color: colorHex,
@@ -62,6 +62,7 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT) {
     mesh.receiveShadow = true;
     mesh.userData.weight = (Number.isFinite(weight) && weight > 0) ? weight : DEFAULT_WEIGHT;
     mesh.userData.locked = false;
+    mesh.userData.label = (typeof label === 'string' && label.trim()) ? label.trim() : 'Objekt';
 
     // Better edges
     const objEdges = new THREE.EdgesGeometry(geo);
@@ -86,8 +87,9 @@ export function duplicateObject(obj) {
     const { width, height, depth } = obj.geometry.parameters;
     const color = obj.material.color.getHex();
     const weight = obj.userData.weight ?? DEFAULT_WEIGHT;
+    const label = obj.userData.label;
 
-    const copy = addBox(width, height, depth, color, weight);
+    const copy = addBox(width, height, depth, color, weight, label);
     copy.position.set(obj.position.x + 0.1, obj.position.y, obj.position.z + 0.1);
     clampToVan(copy, copy.position);
     return copy;

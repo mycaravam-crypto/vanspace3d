@@ -5,6 +5,9 @@ vi.mock('./objects.js', () => ({
     addBox: vi.fn(() => ({})),
     clearAllObjects: vi.fn(),
     clearUnlockedObjects: vi.fn(),
+    toggleLock: vi.fn(),
+    removeObject: vi.fn(),
+    flashReject: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
 vi.mock('./persistence.js', () => ({
@@ -22,14 +25,21 @@ vi.mock('./history.js', () => ({
     canUndo: vi.fn(() => false),
     canRedo: vi.fn(() => false),
 }));
+vi.mock('./controls.js', () => ({
+    selectObject: vi.fn(),
+    setCameraView: vi.fn(),
+}));
 
-const { vanState, DEFAULT_VAN_STATE } = await import('./state.js');
+const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
-const { addBox, clearAllObjects, clearUnlockedObjects } = await import('./objects.js');
+const {
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, flashReject,
+} = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
 } = await import('./persistence.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
+const { selectObject } = await import('./controls.js');
 const { STANDARD_LIBRARY } = await import('./library.js');
 const { initUI, isSnapEnabled, refreshHistoryButtons } = await import('./ui.js');
 
@@ -46,6 +56,7 @@ function mountFixture() {
 
         <div id="standard-library-list"></div>
 
+        <input id="custom-name" value="">
         <input id="custom-w" value="50">
         <input id="custom-h" value="40">
         <input id="custom-d" value="80">
@@ -53,10 +64,19 @@ function mountFixture() {
         <input id="custom-c" value="#10b981">
         <button id="add-custom"></button>
 
+        <div id="object-list"></div>
+
         <span id="obj-count"></span>
         <span id="total-weight"></span>
         <span id="cog-info"></span>
         <button id="clear-all"></button>
+
+        <div id="camera-toolbar">
+            <button id="cam-top"></button>
+            <button id="cam-front"></button>
+            <button id="cam-side"></button>
+            <button id="cam-reset"></button>
+        </div>
 
         <input type="range" id="van-len" value="3.3">
         <input type="range" id="van-front-len" value="1.6">
@@ -85,11 +105,16 @@ function mountFixture() {
 
 beforeEach(() => {
     Object.assign(vanState, DEFAULT_VAN_STATE);
+    objects.length = 0;
     mountFixture();
     buildVanGeometry.mockClear();
     addBox.mockClear();
     clearAllObjects.mockClear();
     clearUnlockedObjects.mockClear();
+    toggleLock.mockClear();
+    removeObject.mockClear();
+    flashReject.mockClear();
+    selectObject.mockClear();
     saveConfig.mockClear();
     saveConfig.mockReturnValue(true);
     loadConfig.mockClear();
@@ -198,12 +223,18 @@ describe('standard library rendering', () => {
         expect(buttons).toHaveLength(STANDARD_LIBRARY.length);
     });
 
-    it('calls addBox with the exact dimensions/color/weight for every library entry', () => {
+    it('calls addBox with the exact dimensions/color/weight/label for every library entry', () => {
         STANDARD_LIBRARY.forEach((item) => {
             addBox.mockClear();
             document.querySelector(`#standard-library-list button[data-lib-id="${item.id}"]`).click();
-            expect(addBox).toHaveBeenCalledWith(item.w, item.h, item.d, item.color, item.weight);
+            expect(addBox).toHaveBeenCalledWith(item.w, item.h, item.d, item.color, item.weight, item.label);
         });
+    });
+
+    it('shows the weight in the button label', () => {
+        const first = STANDARD_LIBRARY[0];
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
+        expect(btn.textContent).toContain(`${first.weight}kg`);
     });
 
     it('captures an undo point before adding a library object', () => {
@@ -222,19 +253,30 @@ describe('standard library rendering', () => {
 describe('object panel buttons', () => {
     it('adds a custom object converted from cm to meters, with the given weight', () => {
         document.getElementById('add-custom').click();
-        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5);
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
     });
 
     it('falls back to the default weight for an invalid custom weight', () => {
         document.getElementById('custom-weight').value = '-3';
         document.getElementById('add-custom').click();
-        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5); // DEFAULT_WEIGHT mock = 5
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt'); // DEFAULT_WEIGHT mock = 5
     });
 
     it('passes the exact color picker value through to addBox unmodified', () => {
         document.getElementById('custom-c').value = '#ff00aa';
         document.getElementById('add-custom').click();
-        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#ff00aa', 5);
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#ff00aa', 5, 'Eigenes Objekt');
+    });
+
+    it('passes a custom name through to addBox as the label', () => {
+        document.getElementById('custom-name').value = '  Werkzeugkiste  ';
+        document.getElementById('add-custom').click();
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Werkzeugkiste');
+    });
+
+    it('falls back to "Eigenes Objekt" when no name is given', () => {
+        document.getElementById('add-custom').click();
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
     });
 
     it('rejects an empty/non-numeric custom dimension without calling addBox', () => {
@@ -272,6 +314,100 @@ describe('object panel buttons', () => {
         expect(captureUndoPoint).toHaveBeenCalled();
         expect(clearUnlockedObjects).toHaveBeenCalled();
         expect(clearAllObjects).not.toHaveBeenCalled();
+    });
+});
+
+// renderObjectList() isn't exported directly — it's exercised through
+// refreshHistoryButtons(), which every real mutation site already calls.
+// Fake mesh-like entries only need the shape renderObjectList() reads
+// (geometry.parameters + userData), not real THREE objects.
+function makeFakeObj({
+    width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, locked = false,
+} = {}) {
+    return {
+        geometry: { parameters: { width, height, depth } },
+        userData: { label, weight, locked },
+    };
+}
+
+describe('object list panel', () => {
+    it('shows a placeholder when nothing is placed', () => {
+        refreshHistoryButtons();
+        expect(document.getElementById('object-list').textContent).toMatch(/keine objekte/i);
+    });
+
+    it('renders one row per placed object with label, size and weight', () => {
+        objects.push(makeFakeObj({ label: 'Eurobox M', width: 0.6, height: 0.32, depth: 0.4, weight: 8 }));
+        refreshHistoryButtons();
+
+        const list = document.getElementById('object-list');
+        expect(list.textContent).toContain('Eurobox M');
+        expect(list.textContent).toContain('60x40x32');
+        expect(list.textContent).toContain('8kg');
+    });
+
+    it('escapes a label containing HTML instead of injecting it', () => {
+        objects.push(makeFakeObj({ label: '<img src=x onerror=alert(1)>' }));
+        refreshHistoryButtons();
+
+        const list = document.getElementById('object-list');
+        expect(list.querySelector('img')).toBeNull();
+        expect(list.textContent).toContain('<img src=x onerror=alert(1)>');
+    });
+
+    it('clicking a row selects the object via controls.js', () => {
+        const obj = makeFakeObj();
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        document.querySelector('#object-list button[data-action="select"]').click();
+        expect(selectObject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the lock icon toggles lock and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="lock"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(toggleLock).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking delete on an unlocked object removes it and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="delete"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(removeObject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking delete on a locked object flashes it instead of removing it', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="delete"]').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(removeObject).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+});
+
+describe('camera view toolbar', () => {
+    it('calls setCameraView with the matching preset for each button', async () => {
+        const { setCameraView } = await import('./controls.js');
+        const cases = [['cam-top', 'top'], ['cam-front', 'front'], ['cam-side', 'side'], ['cam-reset', 'iso']];
+        cases.forEach(([id, view]) => {
+            setCameraView.mockClear();
+            document.getElementById(id).click();
+            expect(setCameraView).toHaveBeenCalledWith(view);
+        });
     });
 });
 

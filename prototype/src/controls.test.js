@@ -32,13 +32,15 @@ vi.mock('./history.js', () => ({
     redo: vi.fn(() => false),
 }));
 
-const { objects } = await import('./state.js');
+const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
     rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
 } = await import('./objects.js');
 const { syncSlidersFromState, refreshHistoryButtons } = await import('./ui.js');
 const { captureUndoPoint, undo, redo } = await import('./history.js');
-const { orbitControls, dragControls } = await import('./controls.js');
+const {
+    orbitControls, dragControls, selectObject, setCameraView,
+} = await import('./controls.js');
 
 function makeTrackedBox(w = 0.6, h = 0.32, d = 0.4) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial());
@@ -72,6 +74,7 @@ beforeEach(() => {
         fire('hoveroff', lastActive);
     }
     objects.length = 0;
+    Object.assign(vanState, DEFAULT_VAN_STATE);
     snapEnabled = true;
     rotate90.mockClear();
     removeObject.mockClear();
@@ -518,5 +521,86 @@ describe('keyboard shortcuts', () => {
             keydown('z', { ctrlKey: true }); // nothing hovered
             expect(undo).toHaveBeenCalled();
         });
+    });
+});
+
+describe('selectObject', () => {
+    it('highlights the given object like a mouse hover would', () => {
+        const mesh = makeTrackedBox();
+        selectObject(mesh);
+        lastActive = mesh; // dispatched internally, not through fire()
+
+        expect(mesh.material.emissive.getHex()).toBe(0x222222);
+    });
+
+    it('clears the highlight on the previously selected object first', () => {
+        const first = makeTrackedBox();
+        const second = makeTrackedBox();
+
+        selectObject(first);
+        selectObject(second);
+        lastActive = second;
+
+        expect(first.material.emissive.getHex()).toBe(0x000000);
+        expect(second.material.emissive.getHex()).toBe(0x222222);
+    });
+
+    it('does nothing for an object that is not tracked', () => {
+        const stranger = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), new THREE.MeshStandardMaterial());
+        expect(() => selectObject(stranger)).not.toThrow();
+        expect(document.body.style.cursor).not.toBe('grab');
+    });
+
+    it('is a no-op while a drag is in progress', () => {
+        const dragged = makeTrackedBox();
+        fire('dragstart', dragged);
+
+        const other = makeTrackedBox();
+        selectObject(other);
+
+        expect(other.material.emissive.getHex()).toBe(0x000000);
+
+        fire('dragend', dragged); // cleanup: end the drag this test started
+        lastActive = dragged;
+    });
+});
+
+describe('setCameraView', () => {
+    it('frames the van from the top with the target centered on the floor', () => {
+        setCameraView('top');
+        expect(orbitControls.target.y).toBeCloseTo(0);
+        expect(orbitControls.object.position.y).toBeGreaterThan(0);
+    });
+
+    it('frames the van from the front, looking along -Z, target at mid-height', () => {
+        setCameraView('front');
+        expect(orbitControls.target.y).toBeCloseTo(vanState.maxHeight / 2);
+        expect(orbitControls.object.position.z).toBeGreaterThan(0);
+        expect(orbitControls.object.position.x).toBeCloseTo(0);
+    });
+
+    it('frames the van from the side, target at mid-height', () => {
+        setCameraView('side');
+        expect(orbitControls.target.y).toBeCloseTo(vanState.maxHeight / 2);
+        expect(orbitControls.object.position.x).toBeGreaterThan(0);
+    });
+
+    it('falls back to the default isometric framing for an unknown/missing view', () => {
+        setCameraView('iso');
+        expect(orbitControls.target.y).toBeCloseTo(1);
+        expect(orbitControls.object.position.x).toBeGreaterThan(0);
+        expect(orbitControls.object.position.y).toBeGreaterThan(0);
+        expect(orbitControls.object.position.z).toBeGreaterThan(0);
+    });
+
+    it('scales the framing distance with the current van dimensions', () => {
+        setCameraView('front');
+        const smallZ = orbitControls.object.position.z;
+
+        vanState.length = 10;
+        setCameraView('front');
+        const largeZ = orbitControls.object.position.z;
+
+        expect(largeZ).toBeGreaterThan(smallZ);
     });
 });
