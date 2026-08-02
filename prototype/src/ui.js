@@ -6,7 +6,7 @@ import {
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
 import {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
 } from './persistence.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
 import { selectObject, setCameraView } from './controls.js';
@@ -389,6 +389,11 @@ function initPersistence() {
     document.getElementById('export-config').addEventListener('click', () => {
         exportToFile();
         showStatus('Exportiert ✓');
+    });
+
+    document.getElementById('export-packing-list').addEventListener('click', () => {
+        exportPackingListToFile();
+        showStatus('Packliste exportiert ✓');
     });
 
     document.getElementById('import-config-file').addEventListener('change', (e) => {
