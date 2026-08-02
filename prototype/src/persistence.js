@@ -50,6 +50,12 @@ function sanitizeWeight(w) {
     return (isFiniteNumber(w) && w > 0 && w <= 2000) ? w : DEFAULT_WEIGHT;
 }
 
+// Same leniency as weight: missing (old saves) or invalid falls back to
+// addBox()'s own "Objekt" default rather than disqualifying the entry.
+function sanitizeLabel(l) {
+    return (typeof l === 'string' && l.trim()) ? l.trim().slice(0, 60) : null;
+}
+
 function isValidPayloadShape(payload) {
     return !!payload && typeof payload === 'object' && Array.isArray(payload.objects);
 }
@@ -68,6 +74,7 @@ export function serializeState() {
             d: o.geometry.parameters.depth,
             color: o.material.color.getHex(),
             weight: o.userData.weight ?? DEFAULT_WEIGHT,
+            label: o.userData.label ?? null,
             locked: !!o.userData.locked,
             position: { x: o.position.x, y: o.position.y, z: o.position.z },
         })),
@@ -81,7 +88,7 @@ export function applyState(payload) {
     clearAllObjects();
     Object.assign(vanState, sanitizeVanState(payload.vanState));
     (payload.objects || []).filter(isSaneObjectEntry).forEach((o) => {
-        const mesh = addBox(o.w, o.h, o.d, o.color, sanitizeWeight(o.weight));
+        const mesh = addBox(o.w, o.h, o.d, o.color, sanitizeWeight(o.weight), sanitizeLabel(o.label));
         mesh.position.set(o.position.x, o.position.y, o.position.z);
         if (o.locked) toggleLock(mesh); // addBox() always creates unlocked, so toggle only when true
     });

@@ -24,6 +24,14 @@
     </style>
 </head>
 <body class="antialiased text-gray-800">
+    <!-- Camera view presets — floats over the 3D viewport, not tab-scoped -->
+    <div id="camera-toolbar" class="absolute top-4 right-4 z-10 flex gap-1 bg-white/95 backdrop-blur rounded-lg shadow-lg border border-gray-200 p-1">
+        <button id="cam-top" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded" title="Draufsicht">Oben</button>
+        <button id="cam-front" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded" title="Vorderansicht">Vorne</button>
+        <button id="cam-side" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded" title="Seitenansicht">Seite</button>
+        <button id="cam-reset" class="px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded border-l border-gray-200 ml-1" title="Ansicht zur&uuml;cksetzen">&#8635;</button>
+    </div>
+
     <!-- UI Overlay -->
     <div id="ui-container" class="absolute top-4 left-4 bg-white/95 backdrop-blur p-5 rounded-xl shadow-2xl w-80 max-h-[95vh] overflow-y-auto border border-gray-200 z-10 flex flex-col gap-4">
 
@@ -57,6 +65,10 @@
             <!-- Custom Object Generator -->
             <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
                 <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt (cm)</h2>
+                <div class="mb-3">
+                    <label class="block text-[10px] text-slate-500 font-bold mb-1">Name (optional)</label>
+                    <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                </div>
                 <div class="grid grid-cols-4 gap-2 mb-3">
                     <div>
                         <label class="block text-[10px] text-slate-500 font-bold mb-1">Breite</label>
@@ -79,6 +91,12 @@
                     <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
                     <button id="add-custom" class="flex-1 bg-slate-800 text-white text-xs font-semibold rounded hover:bg-slate-700 shadow-sm">Generieren</button>
                 </div>
+            </div>
+
+            <!-- Object list (inspector) — rendered/updated by ui.js's renderObjectList() -->
+            <div>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Platzierte Objekte</h2>
+                <div id="object-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5"></div>
             </div>
 
             <!-- Stats & Clear -->
@@ -174,6 +192,8 @@
         <!-- Instructions / Helpers -->
         <div class="mt-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 leading-relaxed shadow-inner">
             <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
+            <p class="mb-1"><span class="font-bold">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole sperren/l&ouml;schen direkt.</p>
+            <p class="mb-1"><span class="font-bold">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
             <p class="mb-1"><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
             <p class="mb-1"><span class="font-bold">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>.</p>
             <p class="mb-1"><span class="font-bold">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">D</kbd>.</p>

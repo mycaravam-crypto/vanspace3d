@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { DragControls } from 'three/addons/controls/DragControls.js';
 import { camera, renderer } from './scene.js';
-import { objects } from './state.js';
+import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision } from './collision.js';
 import {
     rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
@@ -138,6 +138,48 @@ dragControls.addEventListener('drag', (event) => {
     // Final apply
     obj.position.copy(lastValidPos);
 });
+
+// Programmatically selects/highlights an object — used by the object-list
+// panel in ui.js so clicking a row behaves exactly like hovering the object
+// in the 3D view (same emissive highlight, same activeObj that the keyboard
+// shortcuts below act on).
+export function selectObject(obj) {
+    if (isDragging || !isValidTarget(obj)) return;
+    if (activeObj && activeObj !== obj) {
+        dragControls.dispatchEvent({ type: 'hoveroff', object: activeObj });
+    }
+    dragControls.dispatchEvent({ type: 'hoveron', object: obj });
+}
+
+// Distance far enough back to frame the whole van regardless of its current
+// (user-adjustable) size.
+function frameDistance() {
+    return Math.max(vanState.length, vanState.maxWidth, vanState.maxHeight) * 1.6 + 2;
+}
+
+// Camera view presets for the toolbar in ui.js. 'top'/'front'/'side' are
+// orthogonal-ish framing angles for precise layout work; anything else
+// (including no argument) resets to the default isometric view.
+export function setCameraView(view) {
+    const dist = frameDistance();
+    const midHeight = vanState.maxHeight / 2;
+
+    if (view === 'top') {
+        // Tiny x/z offset avoids the camera-directly-above up-vector singularity.
+        camera.position.set(0.001, dist, 0.001);
+        orbitControls.target.set(0, 0, 0);
+    } else if (view === 'front') {
+        camera.position.set(0, midHeight, dist);
+        orbitControls.target.set(0, midHeight, 0);
+    } else if (view === 'side') {
+        camera.position.set(dist, midHeight, 0);
+        orbitControls.target.set(0, midHeight, 0);
+    } else {
+        camera.position.set(dist * 0.65, dist * 0.65, dist * 0.85);
+        orbitControls.target.set(0, 1, 0);
+    }
+    orbitControls.update();
+}
 
 // Keyboard shortcuts
 window.addEventListener('keydown', (e) => {
