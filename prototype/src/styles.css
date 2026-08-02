@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #0f172a;
+    user-select: none;
+    font-family: 'Inter', sans-serif;
+}
+
+/* Custom scrollbar for a cleaner look */
+#ui-container::-webkit-scrollbar { width: 4px; }
+#ui-container::-webkit-scrollbar-track { background: transparent; }
+#ui-container::-webkit-scrollbar-thumb { background: #94a3b8; border-radius: 4px; }
+
+.tab-btn { transition: all 0.2s ease; }
+.tab-btn.active { color: #2563eb; border-bottom: 2px solid #2563eb; }
+.tab-btn.inactive { color: #64748b; border-bottom: 2px solid transparent; }
+.tab-btn.inactive:hover { color: #334155; }
+
+input[type="range"] { cursor: pointer; }
+input[type="number"] { transition: border-color 0.2s; }
+button { transition: all 0.2s ease; cursor: pointer; }
