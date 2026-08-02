@@ -231,11 +231,11 @@ export function syncSlidersFromState() {
 // away since the scanner never sees the resolved string. This lookup keeps
 // every accent's full class names literal so the build doesn't purge them.
 const LIBRARY_ACCENT_CLASSES = {
-    sky: { border: 'border-l-sky-500', hoverText: 'group-hover:text-sky-600' },
-    blue: { border: 'border-l-blue-500', hoverText: 'group-hover:text-blue-600' },
-    indigo: { border: 'border-l-indigo-500', hoverText: 'group-hover:text-indigo-600' },
-    cyan: { border: 'border-l-cyan-500', hoverText: 'group-hover:text-cyan-600' },
-    amber: { border: 'border-l-amber-500', hoverText: 'group-hover:text-amber-600' },
+    sky: { border: 'border-l-sky-500', hoverBg: 'hover:bg-sky-50 hover:border-sky-300', hoverText: 'group-hover:text-sky-600' },
+    blue: { border: 'border-l-blue-500', hoverBg: 'hover:bg-blue-50 hover:border-blue-300', hoverText: 'group-hover:text-blue-600' },
+    indigo: { border: 'border-l-indigo-500', hoverBg: 'hover:bg-indigo-50 hover:border-indigo-300', hoverText: 'group-hover:text-indigo-600' },
+    cyan: { border: 'border-l-cyan-500', hoverBg: 'hover:bg-cyan-50 hover:border-cyan-300', hoverText: 'group-hover:text-cyan-600' },
+    amber: { border: 'border-l-amber-500', hoverBg: 'hover:bg-amber-50 hover:border-amber-300', hoverText: 'group-hover:text-amber-600' },
 };
 
 function renderStandardLibrary() {
@@ -245,7 +245,7 @@ function renderStandardLibrary() {
     container.innerHTML = STANDARD_LIBRARY.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
         return `
-        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 ${accent.border} group" data-lib-id="${item.id}">
+        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md ${accent.hoverBg} border-l-4 ${accent.border} group" data-lib-id="${item.id}">
             <span class="text-sm font-medium text-slate-700 ${accent.hoverText}">${item.label}</span>
             <span class="text-right">
                 <span class="block text-[11px] text-slate-400 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
