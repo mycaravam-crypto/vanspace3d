@@ -226,19 +226,34 @@ export function syncSlidersFromState() {
 // ==========================================
 // OBJECT PANEL BINDINGS
 // ==========================================
+// Tailwind's build-time content scanner only picks up class names that
+// appear literally in source — `border-l-${item.accent}-500` would compile
+// away since the scanner never sees the resolved string. This lookup keeps
+// every accent's full class names literal so the build doesn't purge them.
+const LIBRARY_ACCENT_CLASSES = {
+    sky: { border: 'border-l-sky-500', hoverText: 'group-hover:text-sky-600' },
+    blue: { border: 'border-l-blue-500', hoverText: 'group-hover:text-blue-600' },
+    indigo: { border: 'border-l-indigo-500', hoverText: 'group-hover:text-indigo-600' },
+    cyan: { border: 'border-l-cyan-500', hoverText: 'group-hover:text-cyan-600' },
+    amber: { border: 'border-l-amber-500', hoverText: 'group-hover:text-amber-600' },
+};
+
 function renderStandardLibrary() {
     const container = document.getElementById('standard-library-list');
     if (!container) return;
 
-    container.innerHTML = STANDARD_LIBRARY.map((item) => `
-        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-${item.accent}-500 group" data-lib-id="${item.id}">
-            <span class="text-sm font-medium text-slate-700 group-hover:text-${item.accent}-600">${item.label}</span>
+    container.innerHTML = STANDARD_LIBRARY.map((item) => {
+        const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
+        return `
+        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 ${accent.border} group" data-lib-id="${item.id}">
+            <span class="text-sm font-medium text-slate-700 ${accent.hoverText}">${item.label}</span>
             <span class="text-right">
                 <span class="block text-[11px] text-slate-400 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
                 <span class="block text-[10px] text-slate-400 font-mono">${item.weight}kg</span>
             </span>
         </button>
-    `).join('');
+    `;
+    }).join('');
 
     container.querySelectorAll('button[data-lib-id]').forEach((btn) => {
         const item = STANDARD_LIBRARY.find((i) => i.id === btn.dataset.libId);
