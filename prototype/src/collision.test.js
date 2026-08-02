@@ -149,6 +149,29 @@ describe('checkCollision', () => {
         // objects list intentionally left empty — nothing to collide against.
         expect(checkCollision(a)).toBe(false);
     });
+
+    it('ignores objects in the exclude set (used by group-drag to ignore fellow group members)', () => {
+        const a = makeBox(0.6, 0.32, 0.4);
+        a.position.set(0, 0.16, 0);
+        const b = makeBox(0.6, 0.32, 0.4);
+        b.position.set(0.1, 0.16, 0); // overlapping with a
+        objects.push(a, b);
+
+        expect(checkCollision(a)).toBe(true); // sanity: does collide without exclusion
+        expect(checkCollision(a, new Set([b]))).toBe(false);
+    });
+
+    it('still reports a collision against an object outside the exclude set', () => {
+        const a = makeBox(0.6, 0.32, 0.4);
+        a.position.set(0, 0.16, 0);
+        const excluded = makeBox(0.6, 0.32, 0.4);
+        excluded.position.set(0.1, 0.16, 0);
+        const other = makeBox(0.3, 0.32, 0.3);
+        other.position.set(-0.15, 0.16, 0); // also overlapping a
+        objects.push(a, excluded, other);
+
+        expect(checkCollision(a, new Set([excluded]))).toBe(true);
+    });
 });
 
 describe('findFaceSnap', () => {

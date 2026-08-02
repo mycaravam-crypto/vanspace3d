@@ -11,6 +11,7 @@ export const DEFAULT_WEIGHT = 5;
 
 const DEFAULT_EDGE_COLOR = 0x000000;
 const LOCKED_EDGE_COLOR = 0xef4444; // same red family as the "action rejected" flash
+const SELECTED_EDGE_COLOR = 0x3b82f6; // blue — multi-selection (see selection.js)
 
 // ==========================================
 // OBJECT MANAGEMENT
@@ -40,11 +41,17 @@ export function flashReject(obj) {
     }, 150);
 }
 
-function updateLockVisual(obj) {
+// Edge-outline color, precedence locked > selected > default. Both
+// toggleLock() below and selection.js's mutators call this after flipping
+// their respective userData flag, so the two states always compose
+// correctly regardless of which changed most recently.
+export function refreshObjectAppearance(obj) {
     const edges = obj.children[0];
-    if (edges && edges.material) {
-        edges.material.color.setHex(obj.userData.locked ? LOCKED_EDGE_COLOR : DEFAULT_EDGE_COLOR);
-    }
+    if (!edges || !edges.material) return;
+    const color = obj.userData.locked
+        ? LOCKED_EDGE_COLOR
+        : (obj.userData.selected ? SELECTED_EDGE_COLOR : DEFAULT_EDGE_COLOR);
+    edges.material.color.setHex(color);
 }
 
 export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null) {
@@ -62,6 +69,7 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null)
     mesh.receiveShadow = true;
     mesh.userData.weight = (Number.isFinite(weight) && weight > 0) ? weight : DEFAULT_WEIGHT;
     mesh.userData.locked = false;
+    mesh.userData.selected = false;
     mesh.userData.label = (typeof label === 'string' && label.trim()) ? label.trim() : 'Objekt';
 
     // Better edges
@@ -100,7 +108,7 @@ export function duplicateObject(obj) {
 export function toggleLock(obj) {
     if (!obj || !objects.includes(obj)) return undefined;
     obj.userData.locked = !obj.userData.locked;
-    updateLockVisual(obj);
+    refreshObjectAppearance(obj);
     return obj.userData.locked;
 }
 
