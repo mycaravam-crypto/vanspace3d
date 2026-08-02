@@ -74,13 +74,19 @@ function mountFixture() {
         <div id="standard-library-list"></div>
         <div id="vehicle-preset-list"></div>
 
-        <input id="custom-name" value="">
-        <input id="custom-w" value="50">
-        <input id="custom-h" value="40">
-        <input id="custom-d" value="80">
-        <input id="custom-weight" value="5">
-        <input id="custom-c" value="#10b981">
-        <button id="add-custom"></button>
+        <form id="custom-object-form">
+            <input id="custom-name" value="">
+            <input id="custom-w" value="50">
+            <p id="custom-w-error"></p>
+            <input id="custom-h" value="40">
+            <p id="custom-h-error"></p>
+            <input id="custom-d" value="80">
+            <p id="custom-d-error"></p>
+            <input id="custom-weight" value="5">
+            <p id="custom-weight-error"></p>
+            <input id="custom-c" value="#10b981">
+            <button type="submit" id="add-custom"></button>
+        </form>
 
         <div id="object-list"></div>
 
@@ -421,10 +427,20 @@ describe('object panel buttons', () => {
         expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
     });
 
-    it('falls back to the default weight for an invalid custom weight', () => {
+    it('rejects an invalid custom weight without calling addBox', () => {
         document.getElementById('custom-weight').value = '-3';
         document.getElementById('add-custom').click();
-        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt'); // DEFAULT_WEIGHT mock = 5
+
+        expect(addBox).not.toHaveBeenCalled();
+        expect(document.getElementById('custom-weight-error').textContent).not.toBe('');
+    });
+
+    it('rejects an absurdly large custom weight without calling addBox', () => {
+        document.getElementById('custom-weight').value = '999999999';
+        document.getElementById('add-custom').click();
+
+        expect(addBox).not.toHaveBeenCalled();
+        expect(document.getElementById('custom-weight-error').textContent).not.toBe('');
     });
 
     it('passes the exact color picker value through to addBox unmodified', () => {
@@ -446,32 +462,43 @@ describe('object panel buttons', () => {
 
     it('rejects an empty/non-numeric custom dimension without calling addBox', () => {
         document.getElementById('custom-h').value = '';
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
         document.getElementById('add-custom').click();
 
         expect(addBox).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalled();
+        expect(document.getElementById('custom-h-error').textContent).not.toBe('');
     });
 
     it('rejects non-positive custom dimensions without calling addBox', () => {
         document.getElementById('custom-w').value = '-5';
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
         document.getElementById('add-custom').click();
 
         expect(addBox).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalled();
+        expect(document.getElementById('custom-w-error').textContent).not.toBe('');
     });
 
     it('rejects absurdly large custom dimensions without calling addBox', () => {
         document.getElementById('custom-w').value = '5000';
-        const alertSpy = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
         document.getElementById('add-custom').click();
 
         expect(addBox).not.toHaveBeenCalled();
-        expect(alertSpy).toHaveBeenCalled();
+        expect(document.getElementById('custom-w-error').textContent).not.toBe('');
+    });
+
+    it('clears a previous field error once a valid value is submitted', () => {
+        document.getElementById('custom-w').value = '-5';
+        document.getElementById('add-custom').click();
+        expect(document.getElementById('custom-w-error').textContent).not.toBe('');
+
+        document.getElementById('custom-w').value = '50';
+        document.getElementById('add-custom').click();
+        expect(document.getElementById('custom-w-error').textContent).toBe('');
+        expect(addBox).toHaveBeenCalled();
+    });
+
+    it('submits the custom object form on Enter (native form submission), not just button click', () => {
+        const form = document.getElementById('custom-object-form');
+        form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+        expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
     });
 
     it('clears unlocked objects (sparing locked ones) and captures an undo point first', () => {
@@ -708,16 +735,32 @@ describe('project persistence', () => {
         expect(document.getElementById('persistence-status').textContent).toMatch(/kein/i);
     });
 
-    it('clears storage, wipes objects, and restores default vanState on reset', () => {
+    it('asks for confirmation, then clears storage, wipes objects, and restores default vanState on reset', () => {
         vanState.length = 4.9;
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
         document.getElementById('reset-config').click();
 
+        expect(confirmSpy).toHaveBeenCalled();
         expect(captureUndoPoint).toHaveBeenCalled();
         expect(clearSavedConfig).toHaveBeenCalled();
         expect(clearAllObjects).toHaveBeenCalled();
         expect(vanState.length).toBe(DEFAULT_VAN_STATE.length);
         expect(document.getElementById('van-len').value).toBe(String(Math.round(DEFAULT_VAN_STATE.length * 100)));
         expect(buildVanGeometry).toHaveBeenCalled();
+        confirmSpy.mockRestore();
+    });
+
+    it('does nothing when the reset confirmation is declined', () => {
+        vanState.length = 4.9;
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+        document.getElementById('reset-config').click();
+
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(clearSavedConfig).not.toHaveBeenCalled();
+        expect(clearAllObjects).not.toHaveBeenCalled();
+        confirmSpy.mockRestore();
     });
 
     it('exports on click', () => {
@@ -794,6 +837,31 @@ describe('named projects', () => {
 
         expect(saveNamedProject).not.toHaveBeenCalled();
         promptSpy.mockRestore();
+    });
+
+    it('save-as asks for confirmation before overwriting an existing project name', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Umzug');
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+
+        document.getElementById('save-as-project').click();
+
+        expect(confirmSpy).toHaveBeenCalled();
+        expect(saveNamedProject).toHaveBeenCalledWith('Umzug');
+        promptSpy.mockRestore();
+        confirmSpy.mockRestore();
+    });
+
+    it('save-as does not overwrite when the confirmation is declined', () => {
+        listProjects.mockReturnValue([{ id: 'abc', name: 'Umzug', savedAt: Date.now() }]);
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Umzug');
+        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+
+        document.getElementById('save-as-project').click();
+
+        expect(saveNamedProject).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
+        confirmSpy.mockRestore();
     });
 
     it('shows a failure status when saveNamedProject rejects the name', () => {

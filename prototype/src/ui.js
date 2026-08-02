@@ -1,7 +1,7 @@
 import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -250,30 +250,62 @@ function renderStandardLibrary() {
     });
 }
 
+// Dimension fields are sanity-checked against a <= 10 (m) bound, rejecting
+// anything over 1000cm; weight gets an analogous upper bound so a stray
+// extra digit can't silently blow past the payload display and skew the
+// center-of-gravity calculation.
+const CUSTOM_DIMENSION_FIELDS = [
+    { id: 'custom-w', errorId: 'custom-w-error', label: 'Breite' },
+    { id: 'custom-h', errorId: 'custom-h-error', label: 'Höhe' },
+    { id: 'custom-d', errorId: 'custom-d-error', label: 'Tiefe' },
+];
+const CUSTOM_WEIGHT_FIELD = { id: 'custom-weight', errorId: 'custom-weight-error', label: 'Gewicht' };
+const isSaneDimension = (v) => Number.isFinite(v) && v > 0 && v <= 10;
+const isSaneWeight = (v) => Number.isFinite(v) && v > 0 && v <= 1000;
+
+function setCustomFieldError(field, message) {
+    const input = document.getElementById(field.id);
+    const errorEl = document.getElementById(field.errorId);
+    if (!input) return;
+    input.classList.toggle('border-red-500', !!message);
+    input.classList.toggle('border-slate-300', !message);
+    if (message) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
+    if (errorEl) errorEl.textContent = message || '';
+}
+
 function initObjectPanel() {
     renderStandardLibrary();
 
-    document.getElementById('add-custom').addEventListener('click', () => {
-        const w = parseFloat(document.getElementById('custom-w').value) / 100;
-        const h = parseFloat(document.getElementById('custom-h').value) / 100;
-        const d = parseFloat(document.getElementById('custom-d').value) / 100;
+    // Wrapped in a <form> (index.html) so pressing Enter in any field submits
+    // it, same as clicking "Generieren".
+    document.getElementById('custom-object-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+
+        const dims = CUSTOM_DIMENSION_FIELDS.map((f) => parseFloat(document.getElementById(f.id).value) / 100);
+        const rawWeight = parseFloat(document.getElementById(CUSTOM_WEIGHT_FIELD.id).value);
         const c = document.getElementById('custom-c').value;
-        const rawWeight = parseFloat(document.getElementById('custom-weight').value);
-        const weight = (Number.isFinite(rawWeight) && rawWeight > 0) ? rawWeight : DEFAULT_WEIGHT;
         const rawName = document.getElementById('custom-name').value.trim();
         const label = rawName || 'Eigenes Objekt';
 
-        // Guard against NaN (empty/invalid input), non-positive, and absurdly
-        // large values (e.g. a stray extra digit) that would silently fail or
-        // spawn a box far outside the visible/interactive area.
-        const isSane = (v) => Number.isFinite(v) && v > 0 && v <= 10;
-        if (isSane(w) && isSane(h) && isSane(d)) {
-            captureUndoPoint();
-            addBox(w, h, d, c, weight, label);
-            refreshHistoryButtons();
-        } else {
-            alert('Bitte gültige Maße zwischen 1 und 1000 cm eingeben.');
+        let firstInvalidId = null;
+        CUSTOM_DIMENSION_FIELDS.forEach((field, i) => {
+            const ok = isSaneDimension(dims[i]);
+            setCustomFieldError(field, ok ? '' : `${field.label}: bitte 1-1000 cm.`);
+            if (!ok) firstInvalidId = firstInvalidId || field.id;
+        });
+        const weightOk = isSaneWeight(rawWeight);
+        setCustomFieldError(CUSTOM_WEIGHT_FIELD, weightOk ? '' : 'Gewicht: bitte 0.1-1000 kg.');
+        if (!weightOk) firstInvalidId = firstInvalidId || CUSTOM_WEIGHT_FIELD.id;
+
+        if (firstInvalidId) {
+            document.getElementById(firstInvalidId).focus();
+            return;
         }
+
+        const [w, h, d] = dims;
+        captureUndoPoint();
+        addBox(w, h, d, c, rawWeight, label);
+        refreshHistoryButtons();
     });
 
     document.getElementById('clear-all').addEventListener('click', () => {
@@ -434,6 +466,7 @@ function initPersistence() {
     });
 
     document.getElementById('reset-config').addEventListener('click', () => {
+        if (!confirm('Laderaum und alle Objekte wirklich zurücksetzen?')) return;
         captureUndoPoint();
         clearSavedConfig();
         clearAllObjects();
@@ -546,6 +579,11 @@ function initNamedProjects() {
     document.getElementById('save-as-project').addEventListener('click', () => {
         const name = prompt('Projektname:');
         if (name === null) return; // cancelled
+
+        const trimmed = name.trim();
+        const existing = listProjects().find((p) => p.name === trimmed);
+        if (existing && !confirm(`"${trimmed}" existiert bereits — überschreiben?`)) return;
+
         if (saveNamedProject(name)) {
             renderProjectList();
             showStatus('Gespeichert ✓');
