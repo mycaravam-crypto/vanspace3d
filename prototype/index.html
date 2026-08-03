@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VanSpace 3D - Prototype</title>
+    <title>VanSpace 3D</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -44,7 +44,7 @@
                 </div>
                 <div>
                     <h1 class="text-lg font-bold text-white tracking-tight leading-tight">VanSpace 3D</h1>
-                    <p class="text-[11px] text-slate-400 font-medium">Prototype v7 (Vite)</p>
+                    <p class="text-[11px] text-slate-400 font-medium">3D-Laderaum-Planer</p>
                 </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
@@ -55,8 +55,8 @@
 
         <!-- Tabs -->
         <div class="flex gap-1 bg-white/5 border border-white/5 rounded-xl p-1">
-            <button id="tab-objects" class="tab-btn active flex-1 py-1.5 text-sm font-semibold">Objekte</button>
-            <button id="tab-config" class="tab-btn inactive flex-1 py-1.5 text-sm font-semibold">Laderaum</button>
+            <button id="tab-objects" class="tab-btn active flex-1 py-1.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">Objekte</button>
+            <button id="tab-config" class="tab-btn inactive flex-1 py-1.5 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">Laderaum</button>
         </div>
 
         <!-- PANEL: OBJECTS -->
@@ -113,23 +113,22 @@
                             <label for="custom-c" class="block text-[10px] text-slate-400 font-bold mb-1">Farbe</label>
                             <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded-lg border border-white/10 cursor-pointer bg-white/5">
                         </div>
-                        <button type="submit" id="add-custom" class="flex-1 h-9 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg hover:from-blue-400 hover:to-indigo-500 shadow-lg shadow-blue-950/40">Generieren</button>
+                        <button type="submit" id="add-custom" class="flex-1 h-9 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg hover:from-blue-400 hover:to-indigo-500 shadow-lg shadow-blue-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Generieren</button>
                     </div>
                 </form>
             </div>
 
             <!-- Object list (inspector) — rendered/updated by ui.js's renderObjectList() -->
             <div>
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Platzierte Objekte</h2>
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Platzierte Objekte</h2>
+                    <span id="obj-count" class="bg-white/10 text-slate-300 px-2 py-0.5 rounded-full text-[10px] font-mono">0</span>
+                </div>
                 <div id="object-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5"></div>
             </div>
 
             <!-- Stats & Clear -->
             <div class="flex flex-col gap-2 pt-2 border-t border-white/10">
-                <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
-                    <span>Plazierte Objekte:</span>
-                    <span id="obj-count" class="bg-white/10 text-slate-200 px-2 py-0.5 rounded-full text-xs">0</span>
-                </div>
                 <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
                     <span>Gesamtgewicht:</span>
                     <span><span id="total-weight" class="transition-colors">0.0</span> / <span id="max-payload-label">400</span> kg</span>
@@ -139,7 +138,7 @@
                     <span id="cog-info">–</span>
                 </div>
                 <p id="payload-warning" class="hidden text-[11px] text-red-400 font-semibold bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5"></p>
-                <button id="clear-all" class="w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm font-semibold">Alle entfernen</button>
+                <button id="clear-all" class="w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-colors">Alle entfernen</button>
             </div>
         </div>
 
@@ -211,31 +210,31 @@
 
         <!-- HISTORY: Undo/Redo — always visible, not tab-scoped -->
         <div class="flex gap-2">
-            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
-            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
+            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
+            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
         </div>
 
         <!-- PROJECT: Save/Load/Reset (localStorage) + Export/Import (JSON file) — always visible, not tab-scoped -->
         <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
-            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Projekt</h2>
+            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Automatische Sicherung</h2>
             <div class="flex gap-2">
-                <button id="save-config" class="flex-1 py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold">Speichern</button>
-                <button id="load-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Laden</button>
-                <button id="reset-config" class="flex-1 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-xs font-semibold">Reset</button>
+                <button id="save-config" class="flex-1 py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Jetzt sichern</button>
+                <button id="load-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Laden</button>
+                <button id="reset-config" class="flex-1 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-colors">Reset</button>
             </div>
             <div class="flex gap-2">
-                <button id="export-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Export (.json)</button>
-                <label for="import-config-file" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold text-center cursor-pointer">Import (.json)</label>
+                <button id="export-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Export (.json)</button>
+                <label for="import-config-file" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold text-center cursor-pointer focus-within:ring-2 focus-within:ring-blue-400/60 transition-colors">Import (.json)</label>
                 <input type="file" id="import-config-file" accept="application/json,.json" class="hidden">
             </div>
-            <button id="export-packing-list" class="w-full py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Packliste (.txt)</button>
+            <button id="export-packing-list" class="w-full py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Packliste (.txt)</button>
             <p id="persistence-status" class="text-[11px] text-emerald-400 font-semibold h-4"></p>
         </div>
 
         <!-- NAMED PROJECTS: multiple independently saved layouts (localStorage), on top of the single autosave slot above -->
         <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
             <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Gespeicherte Projekte</h2>
-            <button id="save-as-project" class="w-full py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold">Speichern als&hellip;</button>
+            <button id="save-as-project" class="w-full py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Als neues Projekt speichern&hellip;</button>
             <div id="project-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto"></div>
         </div>
     </div>
