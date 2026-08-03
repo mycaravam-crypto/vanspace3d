@@ -167,10 +167,19 @@ function initVehiclePresets() {
     const container = document.getElementById('vehicle-preset-list');
     if (!container) return;
 
+    const VAN_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="shrink-0"><path d="M3 16V8a1 1 0 0 1 1-1h10l4 4v5a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z"/><circle cx="7.5" cy="17.5" r="1.5"/><circle cx="16.5" cy="17.5" r="1.5"/></svg>';
+
+    // Dims go on their own line (indented under the label) rather than
+    // squeezed onto the same row as the icon — some preset names ("VW
+    // Transporter (kurz)", "Mercedes Sprinter L2H2") are long enough that
+    // sharing a row with both the icon and the dims forced a truncated label.
     container.innerHTML = VEHICLE_PRESETS.map((preset) => `
-        <button class="flex justify-between items-center px-3 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors hover:bg-white/10 hover:border-white/20 border-l-4 border-l-slate-500 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-preset-id="${preset.id}">
-            <span class="text-sm font-medium text-slate-300 group-hover:text-blue-300">${preset.label}</span>
-            <span class="text-[11px] text-slate-500 font-mono">${(preset.length * 100).toFixed(0)}x${(preset.maxWidth * 100).toFixed(0)}x${(preset.maxHeight * 100).toFixed(0)}</span>
+        <button class="flex flex-col items-start gap-0.5 px-3 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors hover:bg-white/10 hover:border-white/20 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-preset-id="${preset.id}">
+            <span class="flex items-center gap-1.5 min-w-0 text-slate-500 group-hover:text-blue-300">
+                ${VAN_ICON}
+                <span class="text-sm font-medium text-slate-300 group-hover:text-blue-300">${preset.label}</span>
+            </span>
+            <span class="text-[10px] text-slate-500 font-mono pl-[20px]">${(preset.length * 100).toFixed(0)}x${(preset.maxWidth * 100).toFixed(0)}x${(preset.maxHeight * 100).toFixed(0)}</span>
         </button>
     `).join('');
 
@@ -227,16 +236,23 @@ export function syncSlidersFromState() {
 // OBJECT PANEL BINDINGS
 // ==========================================
 // Tailwind's build-time content scanner only picks up class names that
-// appear literally in source — `border-l-${item.accent}-500` would compile
+// appear literally in source — `hover:bg-${item.accent}-500/10` would compile
 // away since the scanner never sees the resolved string. This lookup keeps
 // every accent's full class names literal so the build doesn't purge them.
 const LIBRARY_ACCENT_CLASSES = {
-    sky: { border: 'border-l-sky-400', hoverBg: 'hover:bg-sky-500/10 hover:border-sky-400/40', hoverText: 'group-hover:text-sky-300' },
-    blue: { border: 'border-l-blue-400', hoverBg: 'hover:bg-blue-500/10 hover:border-blue-400/40', hoverText: 'group-hover:text-blue-300' },
-    indigo: { border: 'border-l-indigo-400', hoverBg: 'hover:bg-indigo-500/10 hover:border-indigo-400/40', hoverText: 'group-hover:text-indigo-300' },
-    cyan: { border: 'border-l-cyan-400', hoverBg: 'hover:bg-cyan-500/10 hover:border-cyan-400/40', hoverText: 'group-hover:text-cyan-300' },
-    amber: { border: 'border-l-amber-400', hoverBg: 'hover:bg-amber-500/10 hover:border-amber-400/40', hoverText: 'group-hover:text-amber-300' },
+    sky: { hoverBg: 'hover:bg-sky-500/10 hover:border-sky-400/40' },
+    blue: { hoverBg: 'hover:bg-blue-500/10 hover:border-blue-400/40' },
+    indigo: { hoverBg: 'hover:bg-indigo-500/10 hover:border-indigo-400/40' },
+    cyan: { hoverBg: 'hover:bg-cyan-500/10 hover:border-cyan-400/40' },
+    amber: { hoverBg: 'hover:bg-amber-500/10 hover:border-amber-400/40' },
 };
+
+// A small color swatch showing the object's actual 3D color reads as a more
+// direct "icon" for what you're about to place than an abstract accent
+// stripe — same numeric color used for the box mesh itself (see library.js).
+function swatchHex(colorInt) {
+    return `#${colorInt.toString(16).padStart(6, '0')}`;
+}
 
 function renderStandardLibrary() {
     const container = document.getElementById('standard-library-list');
@@ -245,12 +261,12 @@ function renderStandardLibrary() {
     container.innerHTML = STANDARD_LIBRARY.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
         return `
-        <button class="flex justify-between items-center px-3 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} border-l-4 ${accent.border} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}">
-            <span class="text-sm font-medium text-slate-300 ${accent.hoverText}">${item.label}</span>
-            <span class="text-right">
-                <span class="block text-[11px] text-slate-500 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
-                <span class="block text-[10px] text-slate-500 font-mono">${item.weight}kg</span>
+        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${item.label}: ${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}cm, ${item.weight}kg">
+            <span class="flex items-center gap-1.5 min-w-0">
+                <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
+                <span class="text-sm font-medium text-slate-300 truncate">${item.label}</span>
             </span>
+            <span class="text-[10px] text-slate-500 font-mono truncate">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)} &middot; ${item.weight}kg</span>
         </button>
     `;
     }).join('');
@@ -301,7 +317,7 @@ function setCustomFieldError(field, message) {
     const errorEl = document.getElementById(field.errorId);
     if (!input) return;
     input.classList.toggle('border-red-500', !!message);
-    input.classList.toggle('border-slate-300', !message);
+    input.classList.toggle('border-white/10', !message);
     if (message) input.setAttribute('aria-invalid', 'true'); else input.removeAttribute('aria-invalid');
     if (errorEl) errorEl.textContent = message || '';
 }
@@ -536,6 +552,20 @@ function initPersistence() {
         showStatus('Packliste exportiert ✓');
     });
 
+    // The hidden file input is triggered by a <label for="import-config-file">
+    // styled as an icon button — labels forward a mouse click to their
+    // associated control natively, but not a keyboard Enter/Space on the
+    // label itself, so that needs a manual bridge for keyboard users.
+    const importLabel = document.querySelector('label[for="import-config-file"]');
+    if (importLabel) {
+        importLabel.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                document.getElementById('import-config-file').click();
+            }
+        });
+    }
+
     document.getElementById('import-config-file').addEventListener('change', (e) => {
         const file = e.target.files && e.target.files[0];
         if (!file) return;
@@ -573,6 +603,10 @@ function renderProjectList() {
     if (!container) return;
 
     const list = listProjects();
+
+    const countEl = document.getElementById('project-count');
+    if (countEl) countEl.textContent = list.length;
+
     if (list.length === 0) {
         container.innerHTML = '<p class="text-xs text-slate-500 text-center px-2 py-3 border border-dashed border-white/10 rounded-lg">Keine gespeicherten Projekte</p>';
         return;

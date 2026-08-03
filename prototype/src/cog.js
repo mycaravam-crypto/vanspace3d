@@ -50,7 +50,7 @@ export function refreshCenterOfGravity() {
     const weightEl = document.getElementById('total-weight');
     if (weightEl) {
         weightEl.textContent = totalWeight.toFixed(1);
-        weightEl.classList.toggle('text-red-600', totalWeight > vanState.maxPayload);
+        weightEl.classList.toggle('text-red-400', totalWeight > vanState.maxPayload);
     }
 
     const payloadLabelEl = document.getElementById('max-payload-label');
@@ -66,10 +66,11 @@ export function refreshCenterOfGravity() {
             const lr = cog.x >= 0 ? `${Math.round(cog.x * 100)}cm rechts` : `${Math.round(-cog.x * 100)}cm links`;
             const fb = cog.z >= 0 ? `${Math.round(cog.z * 100)}cm hinten` : `${Math.round(-cog.z * 100)}cm vorne`;
             cogEl.textContent = `${lr}, ${fb} von Fahrzeugmitte`;
+            cogEl.title = cogEl.textContent; // full text on hover in case the chip truncates it
         }
     } else {
         cogMarker.visible = false;
-        if (cogEl) cogEl.textContent = '–';
+        if (cogEl) { cogEl.textContent = '–'; cogEl.title = ''; }
     }
 
     const warningEl = document.getElementById('payload-warning');

@@ -121,7 +121,7 @@ describe('payload / off-center warning', () => {
         objects.push(boxAt(0, 0.1, 0, 50));
         refreshCenterOfGravity();
 
-        expect(document.getElementById('total-weight').classList.contains('text-red-600')).toBe(false);
+        expect(document.getElementById('total-weight').classList.contains('text-red-400')).toBe(false);
         expect(document.getElementById('payload-warning').classList.contains('hidden')).toBe(true);
     });
 
@@ -130,7 +130,7 @@ describe('payload / off-center warning', () => {
         objects.push(boxAt(0, 0.1, 0, 150));
         refreshCenterOfGravity();
 
-        expect(document.getElementById('total-weight').classList.contains('text-red-600')).toBe(true);
+        expect(document.getElementById('total-weight').classList.contains('text-red-400')).toBe(true);
         const warning = document.getElementById('payload-warning');
         expect(warning.classList.contains('hidden')).toBe(false);
         expect(warning.textContent).toMatch(/150.*100/);
@@ -142,7 +142,7 @@ describe('payload / off-center warning', () => {
         objects.push(boxAt(0.6, 0.1, 0, 20)); // well past the threshold
         refreshCenterOfGravity();
 
-        expect(document.getElementById('total-weight').classList.contains('text-red-600')).toBe(false);
+        expect(document.getElementById('total-weight').classList.contains('text-red-400')).toBe(false);
         expect(document.getElementById('payload-warning').classList.contains('hidden')).toBe(false);
     });
 
