@@ -21,6 +21,7 @@ vi.mock('./objects.js', () => ({
     duplicateObject: vi.fn((obj) => obj), // returns something dispatchable by default
     toggleLock: vi.fn(),
     moveVertical: vi.fn(),
+    moveHorizontal: vi.fn(),
     flashReject: vi.fn(),
     // selection.js imports this from the (mocked) './objects.js' too — a
     // no-op stub is enough since these tests assert on userData.selected
@@ -39,7 +40,7 @@ vi.mock('./history.js', () => ({
 const { camera, renderer } = await import('./scene.js');
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
-    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
+    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
 } = await import('./objects.js');
 const { syncSlidersFromState, refreshHistoryButtons } = await import('./ui.js');
 const { captureUndoPoint, undo, redo } = await import('./history.js');
@@ -123,6 +124,7 @@ beforeEach(() => {
     duplicateObject.mockImplementation((obj) => obj);
     toggleLock.mockClear();
     moveVertical.mockClear();
+    moveHorizontal.mockClear();
     flashReject.mockClear();
     captureUndoPoint.mockClear();
     undo.mockClear();
@@ -431,6 +433,18 @@ describe('keyboard shortcuts', () => {
             keydown('l');
             expect(toggleLock).toHaveBeenCalledWith(mesh);
         });
+
+        it('rejects toggling a fixed fixture without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.fixed = true;
+            fire('hoveron', mesh);
+
+            keydown('l');
+
+            expect(toggleLock).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
+        });
     });
 
     describe('vertical movement (ArrowUp/ArrowDown)', () => {
@@ -481,6 +495,74 @@ describe('keyboard shortcuts', () => {
         it('does nothing when no object is hovered', () => {
             keydown('ArrowUp');
             expect(moveVertical).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('horizontal movement (ArrowLeft/ArrowRight, Shift+ArrowUp/ArrowDown)', () => {
+        it('moves the hovered object left on the x axis', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('ArrowLeft');
+
+            expect(captureUndoPoint).toHaveBeenCalled();
+            expect(moveHorizontal).toHaveBeenCalledWith(mesh, 'x', -0.05, true);
+            expect(refreshHistoryButtons).toHaveBeenCalled();
+        });
+
+        it('moves the hovered object right on the x axis', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('ArrowRight');
+
+            expect(moveHorizontal).toHaveBeenCalledWith(mesh, 'x', 0.05, true);
+        });
+
+        it('moves the hovered object forward on the z axis with Shift+ArrowUp', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('ArrowUp', { shiftKey: true });
+
+            expect(moveHorizontal).toHaveBeenCalledWith(mesh, 'z', -0.05, true);
+            expect(moveVertical).not.toHaveBeenCalled();
+        });
+
+        it('moves the hovered object backward on the z axis with Shift+ArrowDown', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('ArrowDown', { shiftKey: true });
+
+            expect(moveHorizontal).toHaveBeenCalledWith(mesh, 'z', 0.05, true);
+        });
+
+        it('plain ArrowUp/ArrowDown (no shift) still move vertically, not on the z axis', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('ArrowUp');
+
+            expect(moveVertical).toHaveBeenCalledWith(mesh, 0.05, true);
+            expect(moveHorizontal).not.toHaveBeenCalled();
+        });
+
+        it('rejects horizontal movement of a locked object without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.locked = true;
+            fire('hoveron', mesh);
+
+            keydown('ArrowLeft');
+
+            expect(moveHorizontal).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
+        });
+
+        it('does nothing when no object is hovered', () => {
+            keydown('ArrowLeft');
+            expect(moveHorizontal).not.toHaveBeenCalled();
         });
     });
 
@@ -558,6 +640,18 @@ describe('keyboard shortcuts', () => {
         it('does nothing when no object is hovered', () => {
             keydown('d', { ctrlKey: true });
             expect(duplicateObject).not.toHaveBeenCalled();
+        });
+
+        it('rejects duplicating a fixed fixture without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.fixed = true;
+            fire('hoveron', mesh);
+
+            keydown('d', { ctrlKey: true });
+
+            expect(duplicateObject).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
         });
     });
 

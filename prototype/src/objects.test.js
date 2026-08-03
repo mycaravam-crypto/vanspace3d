@@ -10,9 +10,10 @@ vi.mock('./scene.js', () => ({
 
 const { scene } = await import('./scene.js');
 const { vanState, objects } = await import('./state.js');
+const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, removeObject, duplicateObject,
-    toggleLock, moveVertical, flashReject, DEFAULT_WEIGHT,
+    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -307,6 +308,124 @@ describe('moveVertical', () => {
         expect(moveVertical(mesh, 0.05, true)).toBe(false);
         expect(mesh.position.y).toBeCloseTo(0.5);
         expect(mesh.material.emissive.getHex()).toBe(0xff0000);
+    });
+});
+
+describe('moveHorizontal', () => {
+    it('moves the object left/right on the x axis by the given delta', () => {
+        const mesh = addBox(0.3, 0.2, 0.3, 0x64748b);
+        mesh.position.set(0, 0.1, -1.0);
+        expect(moveHorizontal(mesh, 'x', 0.05, true)).toBe(true);
+        expect(mesh.position.x).toBeCloseTo(0.05);
+    });
+
+    it('moves the object forward/back on the z axis by the given delta', () => {
+        const mesh = addBox(0.3, 0.2, 0.3, 0x64748b);
+        mesh.position.set(0, 0.1, -1.0);
+        expect(moveHorizontal(mesh, 'z', 0.05, true)).toBe(true);
+        expect(mesh.position.z).toBeCloseTo(-0.95);
+    });
+
+    it('clamps into the van bounds instead of exiting through a wall', () => {
+        const mesh = addBox(0.3, 0.2, 0.3, 0x64748b);
+        mesh.position.set(0, 0.1, -1.0);
+        moveHorizontal(mesh, 'x', 10, true); // absurd delta, should just clamp
+        expect(mesh.position.x).toBeLessThanOrEqual(vanState.maxWidth / 2);
+    });
+
+    it('rolls back and rejects when the move would collide, with snapping enabled', () => {
+        vi.useFakeTimers();
+        const a = addBox(0.3, 0.2, 0.3, 0x64748b);
+        a.position.set(0, 0.1, -1.0);
+        const b = addBox(0.3, 0.2, 0.3, 0x10b981);
+        b.position.set(0.3, 0.1, -1.0); // touching a's right face
+
+        expect(moveHorizontal(a, 'x', 0.05, true)).toBe(false);
+        expect(a.position.x).toBeCloseTo(0);
+        expect(a.material.emissive.getHex()).toBe(0xff0000);
+        vi.advanceTimersByTime(150);
+        vi.useRealTimers();
+    });
+
+    it('allows overlapping moves when snapping is disabled', () => {
+        const a = addBox(0.3, 0.2, 0.3, 0x64748b);
+        a.position.set(0, 0.1, -1.0);
+        const b = addBox(0.3, 0.2, 0.3, 0x10b981);
+        b.position.set(0.3, 0.1, -1.0);
+
+        expect(moveHorizontal(a, 'x', 0.05, false)).toBe(true);
+        expect(a.position.x).toBeCloseTo(0.05);
+    });
+
+    it('refuses to move a locked object and flashes it red instead', () => {
+        const mesh = addBox(0.3, 0.2, 0.3, 0x64748b);
+        mesh.position.set(0, 0.1, -1.0);
+        toggleLock(mesh);
+
+        expect(moveHorizontal(mesh, 'x', 0.05, true)).toBe(false);
+        expect(mesh.position.x).toBeCloseTo(0);
+        expect(mesh.material.emissive.getHex()).toBe(0xff0000);
+    });
+});
+
+describe('fixed obstacles (addBox with options.fixed)', () => {
+    it('marks the object fixed and permanently locked, with zero weight regardless of the requested weight', () => {
+        const mesh = addBox(0.6, 0.4, 0.3, 0x78716c, 25, 'Wassertank', { fixed: true });
+        expect(mesh.userData.fixed).toBe(true);
+        expect(mesh.userData.locked).toBe(true);
+        expect(mesh.userData.weight).toBe(0);
+    });
+
+    it('still occupies space, so cargo placed on top of it collides', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        fixture.position.set(0, 0.2, -1.0);
+
+        const cargo = addBox(0.6, 0.4, 0.3, 0x64748b);
+        cargo.position.copy(fixture.position);
+
+        expect(checkCollision(cargo)).toBe(true);
+    });
+
+    it('defaults to fixed:false, matching the pre-existing addBox(...) call shape', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Objekt');
+        expect(mesh.userData.fixed).toBe(false);
+        expect(mesh.userData.locked).toBe(false);
+    });
+
+    it('refuses to duplicate a fixed fixture and flashes it red instead', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        const before = objects.length;
+
+        expect(duplicateObject(fixture)).toBeNull();
+        expect(objects).toHaveLength(before);
+        expect(fixture.material.emissive.getHex()).toBe(0xff0000);
+    });
+
+    it('refuses to unlock a fixed fixture', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        expect(toggleLock(fixture)).toBe(true); // still locked
+        expect(fixture.userData.locked).toBe(true);
+        expect(fixture.material.emissive.getHex()).toBe(0xff0000);
+    });
+
+    it('cannot be rotated, moved, or deleted — the existing "locked" guards already cover it', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        fixture.position.set(0, 0.2, -1.0);
+
+        expect(rotate90(fixture, true)).toBe(false);
+        expect(moveVertical(fixture, 0.05, true)).toBe(false);
+        expect(moveHorizontal(fixture, 'x', 0.05, true)).toBe(false);
+        expect(removeObject(fixture)).toBe(false);
+        expect(objects).toContain(fixture);
+    });
+
+    it('is spared by clearUnlockedObjects(), same as any other locked object', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        addBox(0.6, 0.32, 0.4, 0x64748b); // ordinary cargo, should be cleared
+
+        clearUnlockedObjects();
+
+        expect(objects).toEqual([fixture]);
     });
 });
 

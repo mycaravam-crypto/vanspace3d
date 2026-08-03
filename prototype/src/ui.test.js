@@ -76,6 +76,7 @@ function mountFixture() {
 
         <form id="custom-object-form">
             <input id="custom-name" value="">
+            <input type="checkbox" id="custom-fixed">
             <input id="custom-w" value="50">
             <p id="custom-w-error"></p>
             <input id="custom-h" value="40">
@@ -501,6 +502,50 @@ describe('object panel buttons', () => {
         expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
     });
 
+    describe('"Fest verbaut" (fixed obstacle) toggle', () => {
+        it('passes the fixed option through to addBox when checked', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt', { fixed: true });
+        });
+
+        it('does not pass a fixed option when unchecked, matching the pre-existing call shape', () => {
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
+        });
+
+        it('disables the weight field while checked, re-enables it once unchecked', () => {
+            const checkbox = document.getElementById('custom-fixed');
+            const weightInput = document.getElementById('custom-weight');
+
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+            expect(weightInput.disabled).toBe(true);
+
+            checkbox.checked = false;
+            checkbox.dispatchEvent(new Event('change'));
+            expect(weightInput.disabled).toBe(false);
+        });
+
+        it('skips weight validation for a fixed obstacle, even with an invalid weight value', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('custom-weight').value = '-3'; // would normally fail validation
+            document.getElementById('add-custom').click();
+
+            expect(addBox).toHaveBeenCalled();
+            expect(document.getElementById('custom-weight-error').textContent).toBe('');
+        });
+
+        it('still validates dimensions for a fixed obstacle', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('custom-w').value = '-5';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(document.getElementById('custom-w-error').textContent).not.toBe('');
+        });
+    });
+
     it('clears unlocked objects (sparing locked ones) and captures an undo point first', () => {
         document.getElementById('clear-all').click();
         expect(captureUndoPoint).toHaveBeenCalled();
@@ -514,11 +559,13 @@ describe('object panel buttons', () => {
 // Fake mesh-like entries only need the shape renderObjectList() reads
 // (geometry.parameters + userData), not real THREE objects.
 function makeFakeObj({
-    width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, locked = false,
+    width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, locked = false, fixed = false,
 } = {}) {
     return {
         geometry: { parameters: { width, height, depth } },
-        userData: { label, weight, locked },
+        userData: {
+            label, weight, locked, fixed,
+        },
     };
 }
 
@@ -622,6 +669,29 @@ describe('object list panel', () => {
         document.querySelector('#object-list button[data-action="delete"]').click();
         expect(captureUndoPoint).not.toHaveBeenCalled();
         expect(removeObject).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('shows "fest verbaut" instead of a weight for a fixed obstacle', () => {
+        objects.push(makeFakeObj({
+            label: 'Wassertank', weight: 0, locked: true, fixed: true,
+        }));
+        refreshHistoryButtons();
+
+        const list = document.getElementById('object-list');
+        expect(list.textContent).toContain('fest verbaut');
+        expect(list.textContent).not.toContain('0kg');
+    });
+
+    it('clicking the lock icon on a fixed obstacle flashes it instead of toggling', () => {
+        const obj = makeFakeObj({ locked: true, fixed: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="lock"]').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(toggleLock).not.toHaveBeenCalled();
         expect(flashReject).toHaveBeenCalledWith(obj);
     });
 });
