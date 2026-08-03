@@ -31,8 +31,8 @@ function initTabs() {
         inactivePanel.classList.add('hidden');
         inactivePanel.classList.remove('flex');
 
-        activeTab.className = 'tab-btn active flex-1 py-2 text-sm font-semibold';
-        inactiveTab.className = 'tab-btn inactive flex-1 py-2 text-sm font-semibold';
+        activeTab.className = 'tab-btn active flex-1 py-1.5 text-sm font-semibold';
+        inactiveTab.className = 'tab-btn inactive flex-1 py-1.5 text-sm font-semibold';
     }
 
     tabObjects.addEventListener('click', () => switchTab(tabObjects, tabConfig, panelObjects, panelConfig));
@@ -168,9 +168,9 @@ function initVehiclePresets() {
     if (!container) return;
 
     container.innerHTML = VEHICLE_PRESETS.map((preset) => `
-        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 border-l-4 border-l-slate-400 group" data-preset-id="${preset.id}">
-            <span class="text-sm font-medium text-slate-700 group-hover:text-blue-600">${preset.label}</span>
-            <span class="text-[11px] text-slate-400 font-mono">${(preset.length * 100).toFixed(0)}x${(preset.maxWidth * 100).toFixed(0)}x${(preset.maxHeight * 100).toFixed(0)}</span>
+        <button class="flex justify-between items-center px-3 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors hover:bg-white/10 hover:border-white/20 border-l-4 border-l-slate-500 group" data-preset-id="${preset.id}">
+            <span class="text-sm font-medium text-slate-300 group-hover:text-blue-300">${preset.label}</span>
+            <span class="text-[11px] text-slate-500 font-mono">${(preset.length * 100).toFixed(0)}x${(preset.maxWidth * 100).toFixed(0)}x${(preset.maxHeight * 100).toFixed(0)}</span>
         </button>
     `).join('');
 
@@ -231,11 +231,11 @@ export function syncSlidersFromState() {
 // away since the scanner never sees the resolved string. This lookup keeps
 // every accent's full class names literal so the build doesn't purge them.
 const LIBRARY_ACCENT_CLASSES = {
-    sky: { border: 'border-l-sky-500', hoverBg: 'hover:bg-sky-50 hover:border-sky-300', hoverText: 'group-hover:text-sky-600' },
-    blue: { border: 'border-l-blue-500', hoverBg: 'hover:bg-blue-50 hover:border-blue-300', hoverText: 'group-hover:text-blue-600' },
-    indigo: { border: 'border-l-indigo-500', hoverBg: 'hover:bg-indigo-50 hover:border-indigo-300', hoverText: 'group-hover:text-indigo-600' },
-    cyan: { border: 'border-l-cyan-500', hoverBg: 'hover:bg-cyan-50 hover:border-cyan-300', hoverText: 'group-hover:text-cyan-600' },
-    amber: { border: 'border-l-amber-500', hoverBg: 'hover:bg-amber-50 hover:border-amber-300', hoverText: 'group-hover:text-amber-600' },
+    sky: { border: 'border-l-sky-400', hoverBg: 'hover:bg-sky-500/10 hover:border-sky-400/40', hoverText: 'group-hover:text-sky-300' },
+    blue: { border: 'border-l-blue-400', hoverBg: 'hover:bg-blue-500/10 hover:border-blue-400/40', hoverText: 'group-hover:text-blue-300' },
+    indigo: { border: 'border-l-indigo-400', hoverBg: 'hover:bg-indigo-500/10 hover:border-indigo-400/40', hoverText: 'group-hover:text-indigo-300' },
+    cyan: { border: 'border-l-cyan-400', hoverBg: 'hover:bg-cyan-500/10 hover:border-cyan-400/40', hoverText: 'group-hover:text-cyan-300' },
+    amber: { border: 'border-l-amber-400', hoverBg: 'hover:bg-amber-500/10 hover:border-amber-400/40', hoverText: 'group-hover:text-amber-300' },
 };
 
 function renderStandardLibrary() {
@@ -245,11 +245,11 @@ function renderStandardLibrary() {
     container.innerHTML = STANDARD_LIBRARY.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
         return `
-        <button class="flex justify-between items-center px-3 py-2 bg-white border border-slate-200 rounded-md ${accent.hoverBg} border-l-4 ${accent.border} group" data-lib-id="${item.id}">
-            <span class="text-sm font-medium text-slate-700 ${accent.hoverText}">${item.label}</span>
+        <button class="flex justify-between items-center px-3 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} border-l-4 ${accent.border} group" data-lib-id="${item.id}">
+            <span class="text-sm font-medium text-slate-300 ${accent.hoverText}">${item.label}</span>
             <span class="text-right">
-                <span class="block text-[11px] text-slate-400 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
-                <span class="block text-[10px] text-slate-400 font-mono">${item.weight}kg</span>
+                <span class="block text-[11px] text-slate-500 font-mono">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}</span>
+                <span class="block text-[10px] text-slate-500 font-mono">${item.weight}kg</span>
             </span>
         </button>
     `;
@@ -383,7 +383,7 @@ function renderObjectList() {
     if (!container) return;
 
     if (objects.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400 italic px-1 py-1">Keine Objekte platziert.</p>';
+        container.innerHTML = '<p class="text-xs text-slate-500 italic px-1 py-1">Keine Objekte platziert.</p>';
         return;
     }
 
@@ -396,18 +396,18 @@ function renderObjectList() {
         const weight = obj.userData.weight ?? 0;
         const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
         const meta = fixed ? `${dims} &middot; fest verbaut` : `${dims} &middot; ${weight}kg`;
-        const rowBorder = selected ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200';
+        const rowBorder = selected ? 'border-blue-400/60 ring-1 ring-blue-400/40 bg-blue-500/10' : 'border-white/10 bg-white/5';
         const lockTitle = fixed ? 'Fest verbaut (dauerhaft gesperrt)' : 'Sperren/Entsperren (L)';
         return `
-            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border ${rowBorder} rounded-md hover:border-blue-300 hover:bg-blue-50/50">
+            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 border ${rowBorder} rounded-lg hover:border-blue-400/40 hover:bg-blue-500/10 transition-colors">
                 <button type="button" data-action="select" data-idx="${i}" class="flex-1 min-w-0 text-left py-0.5">
-                    <div class="text-xs font-medium text-slate-700 truncate">${label}</div>
-                    <div class="text-[10px] text-slate-400 font-mono">${meta}</div>
+                    <div class="text-xs font-medium text-slate-200 truncate">${label}</div>
+                    <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
                 </button>
-                <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&uarr;</button>
-                <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&darr;</button>
-                <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded ${locked ? 'text-red-500 hover:text-red-600' : 'text-slate-300 hover:text-slate-500'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
-                <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
+                <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold">&uarr;</button>
+                <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold">&darr;</button>
+                <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
+                <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-500 hover:text-red-400">${ICON_TRASH}</button>
             </div>`;
     }).join('');
 
@@ -574,18 +574,18 @@ function renderProjectList() {
 
     const list = listProjects();
     if (list.length === 0) {
-        container.innerHTML = '<p class="text-xs text-slate-400 italic px-1 py-1">Keine gespeicherten Projekte.</p>';
+        container.innerHTML = '<p class="text-xs text-slate-500 italic px-1 py-1">Keine gespeicherten Projekte.</p>';
         return;
     }
 
     container.innerHTML = list.map((p) => `
-        <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border border-slate-200 rounded-md hover:border-blue-300 hover:bg-blue-50/50">
+        <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white/5 border border-white/10 rounded-lg hover:border-blue-400/40 hover:bg-blue-500/10 transition-colors">
             <button type="button" data-action="load-project" data-id="${p.id}" class="flex-1 min-w-0 text-left py-0.5">
-                <div class="text-xs font-medium text-slate-700 truncate">${escapeHtml(p.name)}</div>
-                <div class="text-[10px] text-slate-400 font-mono">${formatSavedAt(p.savedAt)}</div>
+                <div class="text-xs font-medium text-slate-200 truncate">${escapeHtml(p.name)}</div>
+                <div class="text-[10px] text-slate-500 font-mono">${formatSavedAt(p.savedAt)}</div>
             </button>
-            <button type="button" data-action="rename-project" data-id="${p.id}" title="Umbenennen" class="p-1.5 rounded text-slate-300 hover:text-slate-600">${ICON_PENCIL}</button>
-            <button type="button" data-action="delete-project" data-id="${p.id}" title="L&ouml;schen" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
+            <button type="button" data-action="rename-project" data-id="${p.id}" title="Umbenennen" class="p-1.5 rounded text-slate-500 hover:text-slate-200">${ICON_PENCIL}</button>
+            <button type="button" data-action="delete-project" data-id="${p.id}" title="L&ouml;schen" class="p-1.5 rounded text-slate-500 hover:text-red-400">${ICON_TRASH}</button>
         </div>`).join('');
 
     container.querySelectorAll('button[data-action]').forEach((btn) => {
