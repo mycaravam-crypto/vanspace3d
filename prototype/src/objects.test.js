@@ -12,7 +12,7 @@ const { scene } = await import('./scene.js');
 const { vanState, objects } = await import('./state.js');
 const { checkCollision } = await import('./collision.js');
 const {
-    addBox, clearAllObjects, clearUnlockedObjects, rotate90, removeObject, duplicateObject,
+    addBox, clearAllObjects, clearUnlockedObjects, rotate90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT,
 } = await import('./objects.js');
 
@@ -413,6 +413,7 @@ describe('fixed obstacles (addBox with options.fixed)', () => {
         fixture.position.set(0, 0.2, -1.0);
 
         expect(rotate90(fixture, true)).toBe(false);
+        expect(resizeObject(fixture, 0.5, 0.5, 0.5, true)).toBe(false);
         expect(moveVertical(fixture, 0.05, true)).toBe(false);
         expect(moveHorizontal(fixture, 'x', 0.05, true)).toBe(false);
         expect(removeObject(fixture)).toBe(false);
@@ -575,5 +576,116 @@ describe('rotate90', () => {
 
         expect(() => vi.advanceTimersByTime(150)).not.toThrow();
         vi.useRealTimers();
+    });
+});
+
+describe('resizeObject', () => {
+    it('changes width/height/depth in place', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        expect(resizeObject(mesh, 0.5, 0.6, 0.3, /* snapEnabled */ true)).toBe(true);
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.5, height: 0.6, depth: 0.3 });
+    });
+
+    it('rebuilds the edge outline to match the new geometry', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        resizeObject(mesh, 0.5, 0.6, 0.3, true);
+        expect(mesh.children[0]).toBeInstanceOf(THREE.LineSegments);
+    });
+
+    it('keeps the object centered at its current position', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        mesh.position.set(0, 0.16, -1.0);
+        resizeObject(mesh, 0.5, 0.6, 0.3, true);
+        expect(mesh.position.x).toBeCloseTo(0);
+        expect(mesh.position.z).toBeCloseTo(-1.0);
+    });
+
+    it('rolls back geometry and position if the resize would collide with another object', () => {
+        const a = addBox(0.4, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.4, 0.32, 0.4, 0x10b981);
+        b.position.set(a.position.x + 0.4, a.position.y, a.position.z); // just clear of a at its original width
+
+        const originalPos = a.position.clone();
+        resizeObject(a, 1.0, 0.32, 0.4, /* snapEnabled */ true); // growing into b
+
+        expect(a.geometry.parameters).toMatchObject({ width: 0.4, height: 0.32, depth: 0.4 });
+        expect(a.position.equals(originalPos)).toBe(true);
+    });
+
+    it('does not roll back on collision when snapping/collision checking is disabled', () => {
+        const a = addBox(0.4, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.4, 0.32, 0.4, 0x10b981);
+        b.position.set(a.position.x + 0.4, a.position.y, a.position.z);
+
+        resizeObject(a, 1.0, 0.32, 0.4, /* snapEnabled */ false);
+
+        expect(a.geometry.parameters).toMatchObject({ width: 1.0, height: 0.32, depth: 0.4 });
+    });
+
+    it('flashes emissive red and restores the original color after a rollback', () => {
+        vi.useFakeTimers();
+        const a = addBox(0.4, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.4, 0.32, 0.4, 0x10b981);
+        b.position.set(a.position.x + 0.4, a.position.y, a.position.z);
+
+        resizeObject(a, 1.0, 0.32, 0.4, true);
+        expect(a.material.emissive.getHex()).toBe(0xff0000);
+
+        vi.advanceTimersByTime(150);
+        expect(a.material.emissive.getHex()).toBe(0x000000);
+        vi.useRealTimers();
+    });
+
+    it('disposes the previous geometry and edge outline instead of leaking on resize', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const oldGeo = mesh.geometry;
+        const oldEdges = mesh.children[0].geometry;
+        const geoDisposeSpy = vi.spyOn(oldGeo, 'dispose');
+        const edgesDisposeSpy = vi.spyOn(oldEdges, 'dispose');
+
+        resizeObject(mesh, 0.5, 0.6, 0.3, true);
+
+        expect(geoDisposeSpy).toHaveBeenCalled();
+        expect(edgesDisposeSpy).toHaveBeenCalled();
+        expect(mesh.geometry).not.toBe(oldGeo);
+    });
+
+    it('refuses to resize a locked object and flashes it red instead', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        toggleLock(mesh);
+        const geoDisposeSpy = vi.spyOn(mesh.geometry, 'dispose');
+
+        expect(resizeObject(mesh, 0.5, 0.6, 0.3, true)).toBe(false);
+
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
+        expect(geoDisposeSpy).not.toHaveBeenCalled();
+        expect(mesh.material.emissive.getHex()).toBe(0xff0000);
+    });
+
+    it('rejects non-finite or non-positive dimensions without mutating the object', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const geoDisposeSpy = vi.spyOn(mesh.geometry, 'dispose');
+
+        expect(resizeObject(mesh, 0, 0.6, 0.3, true)).toBe(false);
+        expect(resizeObject(mesh, NaN, 0.6, 0.3, true)).toBe(false);
+        expect(resizeObject(mesh, -1, 0.6, 0.3, true)).toBe(false);
+
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
+        expect(geoDisposeSpy).not.toHaveBeenCalled();
+    });
+
+    it('clamps the object back into the van bounds if the new size no longer fits at its current position', () => {
+        const mesh = addBox(0.4, 0.32, 0.4, 0x64748b);
+        mesh.position.set(vanState.maxWidth / 2 - 0.2, 0.16, -1.0); // near the right wall
+
+        resizeObject(mesh, 1.5, 0.32, 0.4, true);
+
+        expect(Math.abs(mesh.position.x)).toBeLessThanOrEqual(vanState.maxWidth / 2 + 1e-9);
+    });
+
+    it('returns false for an object that is not tracked', () => {
+        const stray = addBox(0.5, 0.5, 0.5, 0x64748b);
+        clearAllObjects(); // detaches stray without disposing our spy expectations
+        expect(resizeObject(stray, 0.6, 0.6, 0.6, true)).toBe(false);
     });
 });

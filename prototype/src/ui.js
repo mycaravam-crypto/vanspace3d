@@ -1,7 +1,7 @@
 import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, flashReject,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -420,6 +420,7 @@ function renderObjectList() {
                     <div class="text-xs font-medium text-slate-200 truncate">${label}</div>
                     <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
                 </button>
+                <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
                 <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&uarr;</button>
                 <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&darr;</button>
                 <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
@@ -437,6 +438,8 @@ function renderObjectList() {
             const action = btn.dataset.action;
             if (action === 'select') {
                 selectObject(obj);
+            } else if (action === 'edit-dims') {
+                openEditDimsModal(obj);
             } else if (action === 'up' || action === 'down') {
                 if (obj.userData.locked) { flashReject(obj); return; }
                 captureUndoPoint();
@@ -454,6 +457,93 @@ function renderObjectList() {
                 refreshHistoryButtons();
             }
         });
+    });
+}
+
+// ==========================================
+// EDIT DIMENSIONS MODAL
+// ==========================================
+// Lets the user change a placed object's width/height/depth after the fact,
+// instead of only being able to set them at creation time. Opened from the
+// pencil icon on an object-list row; shares the same "1-1000 cm" validation
+// as the custom-object form above.
+const EDIT_DIMS_FIELDS = [
+    { id: 'edit-dims-w', errorId: 'edit-dims-w-error', label: 'Breite' },
+    { id: 'edit-dims-h', errorId: 'edit-dims-h-error', label: 'Höhe' },
+    { id: 'edit-dims-d', errorId: 'edit-dims-d-error', label: 'Tiefe' },
+];
+
+let editingObj = null;
+
+function closeEditDimsModal() {
+    const modal = document.getElementById('edit-dims-modal');
+    if (!modal) return;
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    editingObj = null;
+    EDIT_DIMS_FIELDS.forEach((f) => setCustomFieldError(f, ''));
+}
+
+// Refuses — with the usual red flash, no dialog — for a locked (or fixed,
+// which is always locked) object, since resizeObject() would reject it
+// anyway; better to say so upfront than let the form look usable and only
+// fail on submit.
+function openEditDimsModal(obj) {
+    if (!obj || obj.userData.locked) {
+        flashReject(obj);
+        return;
+    }
+    const modal = document.getElementById('edit-dims-modal');
+    if (!modal) return;
+
+    editingObj = obj;
+    const { width, height, depth } = obj.geometry.parameters;
+    document.getElementById('edit-dims-w').value = Math.round(width * CM_PER_M);
+    document.getElementById('edit-dims-h').value = Math.round(height * CM_PER_M);
+    document.getElementById('edit-dims-d').value = Math.round(depth * CM_PER_M);
+    EDIT_DIMS_FIELDS.forEach((f) => setCustomFieldError(f, ''));
+
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function initEditDimsModal() {
+    const modal = document.getElementById('edit-dims-modal');
+    if (!modal) return;
+
+    document.getElementById('edit-dims-close').addEventListener('click', closeEditDimsModal);
+    document.getElementById('edit-dims-cancel').addEventListener('click', closeEditDimsModal);
+    // Click on the backdrop (not the dialog itself) closes it too.
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeEditDimsModal(); });
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeEditDimsModal();
+    });
+
+    document.getElementById('edit-dims-form').addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (!editingObj) return;
+
+        const dims = EDIT_DIMS_FIELDS.map((f) => parseFloat(document.getElementById(f.id).value) / CM_PER_M);
+
+        let firstInvalidId = null;
+        EDIT_DIMS_FIELDS.forEach((field, i) => {
+            const ok = isSaneDimension(dims[i]);
+            setCustomFieldError(field, ok ? '' : `${field.label}: bitte 1-1000 cm.`);
+            if (!ok) firstInvalidId = firstInvalidId || field.id;
+        });
+        if (firstInvalidId) {
+            document.getElementById(firstInvalidId).focus();
+            return;
+        }
+
+        const [w, h, d] = dims;
+        const obj = editingObj;
+        closeEditDimsModal();
+
+        captureUndoPoint();
+        const ok = resizeObject(obj, w, h, d, isSnapEnabled());
+        refreshHistoryButtons();
+        if (!ok) showStatus('Nicht möglich (Kollision).');
     });
 }
 
@@ -682,6 +772,7 @@ export function initUI() {
     initVehiclePresets();
     initConfigSliders();
     initObjectPanel();
+    initEditDimsModal();
     initHistoryButtons();
     initPersistence();
     initNamedProjects();
