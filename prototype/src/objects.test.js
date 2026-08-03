@@ -40,6 +40,45 @@ describe('addBox', () => {
         expect(mesh.position.z).toBeCloseTo(-vanState.length / 2 + 0.4 / 2 + 0.2);
     });
 
+    // Shrunk slightly before testing, same as collision.js's own checkCollision
+    // tolerance — two boxes placed exactly face-to-face (touching, not
+    // overlapping) are a valid, intentional outcome of the open-spot search
+    // and shouldn't be flagged as a collision.
+    const overlaps = (a, b) => {
+        const boxA = new THREE.Box3().setFromCenterAndSize(a.position, new THREE.Vector3(0.6, 0.32, 0.4)).expandByScalar(-0.005);
+        const boxB = new THREE.Box3().setFromCenterAndSize(b.position, new THREE.Vector3(0.6, 0.32, 0.4)).expandByScalar(-0.005);
+        return boxA.intersectsBox(boxB);
+    };
+
+    it('does not spawn a new object exactly on top of an existing one at the same default spot', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+
+        expect(a.position.equals(b.position)).toBe(false);
+        expect(overlaps(a, b)).toBe(false);
+    });
+
+    it('finds an open spot for a third object once the default spot and its neighbor are both taken', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+        const c = addBox(0.6, 0.32, 0.4, 0xf59e0b);
+
+        expect(overlaps(a, b)).toBe(false);
+        expect(overlaps(a, c)).toBe(false);
+        expect(overlaps(b, c)).toBe(false);
+    });
+
+    it('still clamps the found spot into the van bounds', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+
+        [a, b].forEach((mesh) => {
+            expect(Math.abs(mesh.position.x)).toBeLessThanOrEqual(vanState.maxWidth / 2 + 1e-9);
+            expect(mesh.position.y).toBeGreaterThanOrEqual(0.32 / 2 - 1e-9);
+            expect(mesh.position.y).toBeLessThanOrEqual(vanState.maxHeight + 1e-9);
+        });
+    });
+
     it('attaches an edge-outline LineSegments as a child', () => {
         const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
         expect(mesh.children).toHaveLength(1);

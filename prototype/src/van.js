@@ -48,15 +48,23 @@ export function buildVanGeometry() {
     const zFrontStart = -vanState.length / 2;
     const zSplit = zFrontStart + vanState.frontLength;
     const rearLength = Math.max(0, vanState.length - vanState.frontLength);
+    const hasFront = vanState.frontLength > 0.01;
+    const hasRear = rearLength > 0.01;
 
     const zFrontCenter = zFrontStart + (vanState.frontLength / 2);
     const zRearCenter = zSplit + (rearLength / 2);
 
     const floorMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.9 });
 
-    // Front Area (Full Width)
-    if (vanState.frontLength > 0.01) {
-        const frontBox = createVanZone(vanState.maxWidth, vanState.maxHeight, vanState.frontLength, vanState.maxHeight / 2, 0x3b82f6);
+    // Front Area. When a rear zone also exists, the front box only needs to
+    // cover up to the wheel-arch line — the space above that is the same
+    // full-width volume as the rear's upper zone, so it's drawn once below
+    // as a single box spanning the van's full length. Two adjacent
+    // transparent boxes sharing that face would otherwise double-render it
+    // into a fake seam down the middle of the van.
+    if (hasFront) {
+        const frontHeight = hasRear ? vanState.archHeight : vanState.maxHeight;
+        const frontBox = createVanZone(vanState.maxWidth, frontHeight, vanState.frontLength, frontHeight / 2, 0x3b82f6);
         frontBox.position.z = zFrontCenter;
         vanGroup.add(frontBox);
 
@@ -68,17 +76,17 @@ export function buildVanGeometry() {
     }
 
     // Rear Area (Narrow bottom, wide top)
-    if (rearLength > 0.01) {
+    if (hasRear) {
         // Lower narrow area
         const rearLower = createVanZone(vanState.narrowWidth, vanState.archHeight, rearLength, vanState.archHeight / 2, 0x10b981);
         rearLower.position.z = zRearCenter;
         vanGroup.add(rearLower);
 
-        // Upper wide area
+        // Upper wide area — spans the van's FULL length (front + rear
+        // together), not just the rear span; see comment above.
         const upperHeight = Math.max(0.01, vanState.maxHeight - vanState.archHeight);
-        const rearUpper = createVanZone(vanState.maxWidth, upperHeight, rearLength, vanState.archHeight + upperHeight / 2, 0x3b82f6);
-        rearUpper.position.z = zRearCenter;
-        vanGroup.add(rearUpper);
+        const upperZone = createVanZone(vanState.maxWidth, upperHeight, vanState.length, vanState.archHeight + upperHeight / 2, 0x3b82f6);
+        vanGroup.add(upperZone);
 
         // Rear floor
         const rearFloor = new THREE.Mesh(new THREE.PlaneGeometry(vanState.narrowWidth, rearLength), floorMat);

@@ -22,6 +22,29 @@ function updateStats() {
     refreshCenterOfGravity();
 }
 
+// Scans the van's floor-up, front-to-back, left-to-right for the first spot
+// where `mesh` (already positioned at its preferred spawn point) doesn't
+// collide with any existing object, and moves it there. Falls back to
+// leaving `mesh` at its original (possibly overlapping) position if the van
+// is packed too tightly at this grid resolution to find one.
+function placeInFirstOpenSpot(mesh, w, h, d) {
+    const originalPos = mesh.position.clone();
+    const candidate = new THREE.Vector3();
+
+    for (let y = h / 2; y <= vanState.maxHeight + 1e-6; y += h) {
+        for (let z = -vanState.length / 2 + d / 2; z <= vanState.length / 2 - d / 2 + 1e-6; z += d) {
+            for (let x = -vanState.maxWidth / 2 + w / 2; x <= vanState.maxWidth / 2 - w / 2 + 1e-6; x += w) {
+                candidate.set(x, y, z);
+                clampToVan(mesh, candidate);
+                mesh.position.copy(candidate);
+                if (!checkCollision(mesh)) return;
+            }
+        }
+    }
+
+    mesh.position.copy(originalPos);
+}
+
 function disposeAndDetach(obj) {
     scene.remove(obj);
     obj.geometry.dispose();
@@ -81,6 +104,13 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null)
 
     // Spawn safely near the front top
     mesh.position.set(0, vanState.maxHeight - (h / 2) - 0.1, -vanState.length / 2 + (d / 2) + 0.2);
+
+    // The preferred spot above is a fixed point, so it collides with
+    // whatever was added there already — hunt for an open spot instead of
+    // leaving the new object exactly coincident with an existing one.
+    if (checkCollision(mesh)) {
+        placeInFirstOpenSpot(mesh, w, h, d);
+    }
 
     scene.add(mesh);
     objects.push(mesh);
