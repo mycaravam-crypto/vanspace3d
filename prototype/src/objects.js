@@ -241,6 +241,47 @@ export function moveHorizontal(obj, axis, delta, snapEnabled) {
     return moveAxis(obj, axis, delta, snapEnabled);
 }
 
+// Changes obj's width/height/depth in place, keeping its current center
+// position. Clamped to the van bounds and (when snapEnabled) rolled back on
+// collision — the same rules as rotate90() above. Returns false without
+// resizing if obj is locked, isn't tracked, or any dimension isn't a finite
+// positive number.
+export function resizeObject(obj, w, h, d, snapEnabled) {
+    if (!obj || !objects.includes(obj)) return false;
+    if (obj.userData.locked) {
+        flashReject(obj);
+        return false;
+    }
+    if (![w, h, d].every((v) => Number.isFinite(v) && v > 0)) return false;
+
+    const oldW = obj.geometry.parameters.width;
+    const oldH = obj.geometry.parameters.height;
+    const oldD = obj.geometry.parameters.depth;
+
+    obj.geometry.dispose();
+    obj.children[0].geometry.dispose();
+
+    const newGeo = new THREE.BoxGeometry(w, h, d);
+    obj.geometry = newGeo;
+    obj.children[0].geometry = new THREE.EdgesGeometry(newGeo);
+
+    const originalPos = obj.position.clone();
+    clampToVan(obj, obj.position);
+
+    // Rollback if collision detected
+    if (snapEnabled && checkCollision(obj)) {
+        obj.geometry.dispose();
+        obj.children[0].geometry.dispose();
+        const oldGeo = new THREE.BoxGeometry(oldW, oldH, oldD);
+        obj.geometry = oldGeo;
+        obj.children[0].geometry = new THREE.EdgesGeometry(oldGeo);
+        obj.position.copy(originalPos);
+        flashReject(obj);
+        return false;
+    }
+    return true;
+}
+
 export function rotate90(obj, snapEnabled) {
     if (obj.userData.locked) {
         flashReject(obj);

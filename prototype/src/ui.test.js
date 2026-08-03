@@ -8,6 +8,7 @@ vi.mock('./objects.js', () => ({
     toggleLock: vi.fn(),
     removeObject: vi.fn(),
     moveVertical: vi.fn(),
+    resizeObject: vi.fn(() => true),
     flashReject: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
@@ -40,7 +41,7 @@ vi.mock('./controls.js', () => ({
 const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, flashReject,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, flashReject,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
@@ -90,6 +91,20 @@ function mountFixture() {
         </form>
 
         <div id="object-list"></div>
+
+        <div id="edit-dims-modal" class="hidden">
+            <button id="edit-dims-close"></button>
+            <form id="edit-dims-form">
+                <input id="edit-dims-w" value="0">
+                <p id="edit-dims-w-error"></p>
+                <input id="edit-dims-h" value="0">
+                <p id="edit-dims-h-error"></p>
+                <input id="edit-dims-d" value="0">
+                <p id="edit-dims-d-error"></p>
+                <button type="submit"></button>
+            </form>
+            <button id="edit-dims-cancel"></button>
+        </div>
 
         <span id="obj-count"></span>
         <span id="total-weight"></span>
@@ -149,6 +164,8 @@ beforeEach(() => {
     toggleLock.mockClear();
     removeObject.mockClear();
     moveVertical.mockClear();
+    resizeObject.mockClear();
+    resizeObject.mockReturnValue(true);
     flashReject.mockClear();
     selectObject.mockClear();
     saveConfig.mockClear();
@@ -693,6 +710,78 @@ describe('object list panel', () => {
         expect(captureUndoPoint).not.toHaveBeenCalled();
         expect(toggleLock).not.toHaveBeenCalled();
         expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+});
+
+describe('edit-dimensions modal', () => {
+    it('clicking the pencil icon opens the modal pre-filled with the object\'s current size in cm', () => {
+        const obj = makeFakeObj({
+            width: 0.6, height: 0.32, depth: 0.4, locked: false,
+        });
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        document.querySelector('#object-list button[data-action="edit-dims"]').click();
+
+        expect(document.getElementById('edit-dims-modal').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('edit-dims-w').value).toBe('60');
+        expect(document.getElementById('edit-dims-h').value).toBe('32');
+        expect(document.getElementById('edit-dims-d').value).toBe('40');
+    });
+
+    it('clicking the pencil icon on a locked object flashes it instead of opening the modal', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        document.querySelector('#object-list button[data-action="edit-dims"]').click();
+
+        expect(document.getElementById('edit-dims-modal').classList.contains('hidden')).toBe(true);
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('submitting the form resizes the object, captures an undo point, and closes the modal', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="edit-dims"]').click();
+        document.getElementById('edit-dims-w').value = '70';
+        document.getElementById('edit-dims-h').value = '50';
+        document.getElementById('edit-dims-d').value = '45';
+        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('edit-dims-form').dispatchEvent(new Event('submit', { cancelable: true }));
+
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(resizeObject).toHaveBeenCalledWith(obj, 0.7, 0.5, 0.45, false);
+        expect(document.getElementById('edit-dims-modal').classList.contains('hidden')).toBe(true);
+    });
+
+    it('rejects an out-of-range dimension without resizing or closing the modal', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        document.querySelector('#object-list button[data-action="edit-dims"]').click();
+        document.getElementById('edit-dims-w').value = '2000'; // > 1000cm
+        document.getElementById('edit-dims-form').dispatchEvent(new Event('submit', { cancelable: true }));
+
+        expect(resizeObject).not.toHaveBeenCalled();
+        expect(document.getElementById('edit-dims-modal').classList.contains('hidden')).toBe(false);
+        expect(document.getElementById('edit-dims-w-error').textContent).toMatch(/1-1000/);
+    });
+
+    it('cancel button closes the modal without resizing', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        document.querySelector('#object-list button[data-action="edit-dims"]').click();
+        document.getElementById('edit-dims-cancel').click();
+
+        expect(resizeObject).not.toHaveBeenCalled();
+        expect(document.getElementById('edit-dims-modal').classList.contains('hidden')).toBe(true);
     });
 });
 
