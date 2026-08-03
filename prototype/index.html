@@ -71,40 +71,47 @@
             <!-- Standard Objects (rendered from src/library.js by ui.js) -->
             <div>
                 <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Standard-Bibliothek</h2>
-                <div id="standard-library-list" class="grid grid-cols-1 gap-2"></div>
+                <div id="standard-library-list" class="grid grid-cols-2 gap-2"></div>
             </div>
 
-            <!-- Custom Object Generator -->
-            <div class="p-3 bg-white/5 border border-white/10 rounded-xl">
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-3">Eigenes Objekt</h2>
-                <form id="custom-object-form" novalidate>
+            <!-- Custom Object Generator — collapsed by default (progressive disclosure);
+                 used far less often than the standard library above. -->
+            <details class="group bg-white/5 border border-white/10 rounded-xl">
+                <summary class="disclosure-summary flex items-center justify-between gap-2 px-3 py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 rounded-xl">
+                    <span class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-slate-400">
+                        <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                        Eigenes Objekt
+                    </span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0 transition-transform duration-200 group-open:rotate-180"><path d="m6 9 6 6 6-6"/></svg>
+                </summary>
+                <form id="custom-object-form" novalidate class="px-3 pb-3 pt-1">
                     <div class="mb-3">
-                        <label for="custom-name" class="block text-[10px] text-slate-400 font-bold mb-1">Name (optional)</label>
-                        <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm text-slate-100 placeholder-slate-500 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                        <label for="custom-name" class="sr-only">Name (optional)</label>
+                        <input type="text" id="custom-name" placeholder="Name (optional)" maxlength="40" class="w-full text-sm text-slate-100 placeholder-slate-500 bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                     </div>
-                    <label for="custom-fixed" class="flex items-center gap-2 mb-3 cursor-pointer">
+                    <label for="custom-fixed" class="flex items-center gap-2 mb-3 cursor-pointer" title="Fest verbaut: Möbel, Tank – unbeweglich, kein Zuladungsgewicht">
                         <input type="checkbox" id="custom-fixed" class="rounded text-slate-400 bg-white/10 border-white/20 focus:ring-slate-400 focus:ring-offset-0 h-3.5 w-3.5 cursor-pointer">
-                        <span class="text-[10px] text-slate-400 font-semibold">Fest verbaut (Möbel, Tank &ndash; unbeweglich, kein Zuladungsgewicht)</span>
+                        <span class="text-[10px] text-slate-400 font-semibold">Fest verbaut<span class="sr-only"> (Möbel, Tank &ndash; unbeweglich, kein Zuladungsgewicht)</span></span>
                     </label>
                     <div class="grid grid-cols-4 gap-2 mb-3">
                         <div>
-                            <label for="custom-w" class="block text-[10px] text-slate-400 font-bold mb-1">Breite (cm)</label>
-                            <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <label for="custom-w" class="block text-[9px] text-slate-500 font-bold mb-0.5" title="Breite (cm)">B<span class="sr-only">reite (cm)</span></label>
+                            <input type="number" id="custom-w" value="50" min="1" title="Breite (cm)" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                             <p id="custom-w-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-h" class="block text-[10px] text-slate-400 font-bold mb-1">Höhe (cm)</label>
-                            <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <label for="custom-h" class="block text-[9px] text-slate-500 font-bold mb-0.5" title="Höhe (cm)">H<span class="sr-only">öhe (cm)</span></label>
+                            <input type="number" id="custom-h" value="40" min="1" title="Höhe (cm)" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                             <p id="custom-h-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-d" class="block text-[10px] text-slate-400 font-bold mb-1">Tiefe (cm)</label>
-                            <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <label for="custom-d" class="block text-[9px] text-slate-500 font-bold mb-0.5" title="Tiefe (cm)">T<span class="sr-only">iefe (cm)</span></label>
+                            <input type="number" id="custom-d" value="80" min="1" title="Tiefe (cm)" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                             <p id="custom-d-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-weight" class="block text-[10px] text-slate-400 font-bold mb-1">Gewicht (kg)</label>
-                            <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <label for="custom-weight" class="block text-[9px] text-slate-500 font-bold mb-0.5" title="Gewicht (kg)">kg<span class="sr-only"> Gewicht</span></label>
+                            <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" title="Gewicht (kg)" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                             <p id="custom-weight-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                     </div>
@@ -116,7 +123,7 @@
                         <button type="submit" id="add-custom" class="flex-1 h-9 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg hover:from-blue-400 hover:to-indigo-500 shadow-lg shadow-blue-950/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Generieren</button>
                     </div>
                 </form>
-            </div>
+            </details>
 
             <!-- Object list (inspector) — rendered/updated by ui.js's renderObjectList() -->
             <div>
@@ -129,16 +136,21 @@
 
             <!-- Stats & Clear -->
             <div class="flex flex-col gap-2 pt-2 border-t border-white/10">
-                <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
-                    <span>Gesamtgewicht:</span>
-                    <span><span id="total-weight" class="transition-colors">0.0</span> / <span id="max-payload-label">400</span> kg</span>
-                </div>
-                <div class="flex justify-between items-center text-[11px] text-slate-500">
-                    <span>Schwerpunkt:</span>
-                    <span id="cog-info">–</span>
+                <div class="flex gap-2">
+                    <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 shrink-0" title="Gesamtgewicht">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
+                        <span class="text-xs font-semibold text-slate-300 whitespace-nowrap"><span id="total-weight" class="transition-colors">0.0</span>/<span id="max-payload-label">400</span> kg</span>
+                    </div>
+                    <div class="flex-1 min-w-0 flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5" title="Schwerpunkt">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+                        <span id="cog-info" class="text-[11px] text-slate-400 truncate">–</span>
+                    </div>
                 </div>
                 <p id="payload-warning" class="hidden text-[11px] text-red-400 font-semibold bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5"></p>
-                <button id="clear-all" class="w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-colors">Alle entfernen</button>
+                <button id="clear-all" class="w-full flex items-center justify-center gap-1.5 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-colors">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7"/></svg>
+                    Alle entfernen
+                </button>
             </div>
         </div>
 
@@ -208,35 +220,63 @@
             </div>
         </div>
 
-        <!-- HISTORY: Undo/Redo — always visible, not tab-scoped -->
-        <div class="flex gap-2">
-            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
-            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
-        </div>
-
-        <!-- PROJECT: Save/Load/Reset (localStorage) + Export/Import (JSON file) — always visible, not tab-scoped -->
+        <!-- HISTORY + PROJECT PERSISTENCE: icon toolbar — Undo/Redo, autosave
+             Save/Load/Reset, and Export/Import/Packing-list, all always
+             visible (not tab-scoped) since they're common, frequent actions.
+             Each button is icon-only; the title attribute + aria-label carry
+             the name so mouse users get a tooltip and screen readers get an
+             accessible name. -->
         <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
-            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Automatische Sicherung</h2>
-            <div class="flex gap-2">
-                <button id="save-config" class="flex-1 py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Jetzt sichern</button>
-                <button id="load-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Laden</button>
-                <button id="reset-config" class="flex-1 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-colors">Reset</button>
-            </div>
-            <div class="flex gap-2">
-                <button id="export-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Export (.json)</button>
-                <label for="import-config-file" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold text-center cursor-pointer focus-within:ring-2 focus-within:ring-blue-400/60 transition-colors">Import (.json)</label>
+            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Verlauf &amp; Sicherung</h2>
+            <div class="grid grid-cols-4 gap-1.5">
+                <button id="undo-btn" disabled title="Rückgängig (Strg+Z)" aria-label="Rückgängig" class="icon-tool-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H8"/></svg>
+                </button>
+                <button id="redo-btn" disabled title="Wiederholen (Strg+Y)" aria-label="Wiederholen" class="icon-tool-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 14 5-5-5-5"/><path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H16"/></svg>
+                </button>
+                <button id="save-config" title="Jetzt sichern" aria-label="Jetzt sichern" class="icon-tool-btn accent-blue">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z"/><path d="M8 3v6h7V3"/><path d="M8 21v-7h8v7"/></svg>
+                </button>
+                <button id="load-config" title="Laden" aria-label="Laden" class="icon-tool-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+                </button>
+                <button id="reset-config" title="Zurücksetzen" aria-label="Zurücksetzen" class="icon-tool-btn accent-red">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 3v5h5"/></svg>
+                </button>
+                <button id="export-config" title="Export (.json)" aria-label="Export als JSON" class="icon-tool-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                </button>
+                <label for="import-config-file" title="Import (.json)" aria-label="Import aus JSON" tabindex="0" class="icon-tool-btn cursor-pointer">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg>
+                </label>
                 <input type="file" id="import-config-file" accept="application/json,.json" class="hidden">
+                <button id="export-packing-list" title="Packliste (.txt)" aria-label="Packliste exportieren" class="icon-tool-btn">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
+                </button>
             </div>
-            <button id="export-packing-list" class="w-full py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Packliste (.txt)</button>
-            <p id="persistence-status" class="text-[11px] text-emerald-400 font-semibold h-4"></p>
+            <p id="persistence-status" class="text-[11px] text-emerald-400 font-semibold h-4 text-center"></p>
         </div>
 
-        <!-- NAMED PROJECTS: multiple independently saved layouts (localStorage), on top of the single autosave slot above -->
-        <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
-            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Gespeicherte Projekte</h2>
-            <button id="save-as-project" class="w-full py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Als neues Projekt speichern&hellip;</button>
-            <div id="project-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto"></div>
-        </div>
+        <!-- NAMED PROJECTS: multiple independently saved layouts (localStorage),
+             on top of the single autosave slot above. Collapsed by default —
+             a power-user feature, used less often than the autosave slot. -->
+        <details class="group pt-2 border-t border-white/10">
+            <summary class="disclosure-summary flex items-center justify-between gap-2 py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 rounded-lg">
+                <span class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider font-bold text-slate-500">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z"/></svg>
+                    Gespeicherte Projekte
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span id="project-count" class="bg-white/10 text-slate-300 px-1.5 py-0.5 rounded-full text-[10px] font-mono">0</span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0 transition-transform duration-200 group-open:rotate-180"><path d="m6 9 6 6 6-6"/></svg>
+                </span>
+            </summary>
+            <div class="flex flex-col gap-2 mt-2">
+                <button id="save-as-project" class="w-full py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 transition-colors">Als neues Projekt speichern&hellip;</button>
+                <div id="project-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto"></div>
+            </div>
+        </details>
     </div>
 
     <!-- Help modal — hidden by default, opened via the "?" button in the header (id="help-toggle") -->

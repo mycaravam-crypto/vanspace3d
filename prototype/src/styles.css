@@ -33,3 +33,28 @@ button { transition: all 0.2s ease; cursor: pointer; }
 input[type="color"] { -webkit-appearance: none; appearance: none; }
 input[type="color"]::-webkit-color-swatch-wrapper { padding: 3px; }
 input[type="color"]::-webkit-color-swatch { border: none; border-radius: 0.25rem; }
+
+/* Compact icon-only action buttons (history/persistence toolbar) — square,
+   one icon, tooltip carries the label instead of visible text. */
+.icon-tool-btn {
+    display: flex; align-items: center; justify-content: center;
+    aspect-ratio: 1 / 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 0.5rem;
+    color: #cbd5e1;
+    transition: background-color 0.2s, border-color 0.2s, color 0.2s;
+}
+.icon-tool-btn:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.2); color: #fff; }
+.icon-tool-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.6); }
+.icon-tool-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+.icon-tool-btn:disabled:hover { background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: #cbd5e1; }
+.icon-tool-btn.accent-blue { background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.2); color: #93c5fd; }
+.icon-tool-btn.accent-blue:hover { background: rgba(59, 130, 246, 0.2); border-color: rgba(59, 130, 246, 0.3); color: #93c5fd; }
+.icon-tool-btn.accent-red { background: rgba(239, 68, 68, 0.1); border-color: rgba(239, 68, 68, 0.2); color: #f87171; }
+.icon-tool-btn.accent-red:hover { background: rgba(239, 68, 68, 0.2); border-color: rgba(239, 68, 68, 0.3); color: #f87171; }
+
+/* Hide the native <details><summary> marker triangle in both engines — a
+   custom chevron (rotated via group-open:) replaces it. */
+summary.disclosure-summary { list-style: none; cursor: pointer; }
+summary.disclosure-summary::-webkit-details-marker { display: none; }
