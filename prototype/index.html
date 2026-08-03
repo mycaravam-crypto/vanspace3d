@@ -4,24 +4,27 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>VanSpace 3D - Prototype</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/styles.css">
 </head>
-<body class="antialiased text-gray-800">
+<body class="antialiased text-slate-200">
     <!-- Camera view presets — floats over the 3D viewport, not tab-scoped -->
-    <div id="camera-toolbar" class="absolute top-4 right-4 z-10 flex gap-0.5 bg-white/95 backdrop-blur rounded-lg shadow-xl border border-gray-200 p-1">
-        <button id="cam-top" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" title="Draufsicht">
+    <div id="camera-toolbar" class="absolute top-4 right-4 z-10 flex gap-0.5 bg-slate-900/80 backdrop-blur-xl rounded-xl shadow-2xl shadow-black/40 border border-white/10 p-1">
+        <button id="cam-top" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors" title="Draufsicht">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12,3 21,8 12,13 3,8" fill="currentColor" fill-opacity="0.85"></polygon><polygon points="3,8 12,13 12,21 3,16" fill="none"></polygon><polygon points="21,8 12,13 12,21 21,16" fill="none"></polygon></svg>
             <span>Oben</span>
         </button>
-        <button id="cam-front" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" title="Vorderansicht">
+        <button id="cam-front" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors" title="Vorderansicht">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12,3 21,8 12,13 3,8" fill="none"></polygon><polygon points="3,8 12,13 12,21 3,16" fill="currentColor" fill-opacity="0.85"></polygon><polygon points="21,8 12,13 12,21 21,16" fill="none"></polygon></svg>
             <span>Vorne</span>
         </button>
-        <button id="cam-side" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-600 rounded-md hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400" title="Seitenansicht">
+        <button id="cam-side" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors" title="Seitenansicht">
             <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><polygon points="12,3 21,8 12,13 3,8" fill="none"></polygon><polygon points="3,8 12,13 12,21 3,16" fill="none"></polygon><polygon points="21,8 12,13 12,21 21,16" fill="currentColor" fill-opacity="0.85"></polygon></svg>
             <span>Seite</span>
         </button>
-        <button id="cam-reset" class="flex items-center px-2 py-1.5 text-slate-600 rounded-md hover:bg-blue-50 hover:text-blue-600 active:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border-l border-gray-200 ml-0.5 pl-2.5" title="Ansicht zur&uuml;cksetzen" aria-label="Ansicht zur&uuml;cksetzen">
+        <button id="cam-reset" class="flex items-center px-2 py-1.5 text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border-l border-white/10 ml-0.5 pl-2.5 transition-colors" title="Ansicht zur&uuml;cksetzen" aria-label="Ansicht zur&uuml;cksetzen">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 3v5h5"></path></svg>
         </button>
     </div>
@@ -31,98 +34,103 @@
          visible), expanded/collapsed via #panel-toggle. See initResponsivePanel()
          in ui.js for the toggle behavior; layout itself is plain Tailwind
          responsive utilities (mobile-first, overridden at md:). -->
-    <div id="ui-container" class="fixed md:absolute inset-x-0 md:inset-x-auto bottom-0 md:bottom-auto top-auto md:top-4 left-0 md:left-4 bg-white/95 backdrop-blur p-4 md:p-5 rounded-t-2xl md:rounded-xl shadow-2xl w-full md:w-80 max-h-16 md:max-h-[95vh] overflow-hidden md:overflow-y-auto border border-gray-200 z-10 flex flex-col gap-4">
+    <div id="ui-container" class="fixed md:absolute inset-x-0 md:inset-x-auto bottom-0 md:bottom-auto top-auto md:top-4 left-0 md:left-4 bg-slate-900/80 backdrop-blur-xl p-4 md:p-5 rounded-t-2xl md:rounded-2xl shadow-2xl shadow-black/40 w-full md:w-80 max-h-16 md:max-h-[95vh] overflow-hidden md:overflow-y-auto border border-white/10 z-10 flex flex-col gap-4">
 
         <!-- Header -->
         <div class="flex items-start justify-between gap-2 shrink-0">
-            <div>
-                <h1 class="text-xl font-bold text-gray-900 tracking-tight">VanSpace 3D</h1>
-                <p class="text-xs text-gray-500 font-medium">Prototype v7 (Vite)</p>
+            <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/40">
+                    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>
+                </div>
+                <div>
+                    <h1 class="text-lg font-bold text-white tracking-tight leading-tight">VanSpace 3D</h1>
+                    <p class="text-[11px] text-slate-400 font-medium">Prototype v7 (Vite)</p>
+                </div>
             </div>
             <div class="flex items-center gap-1.5 shrink-0">
-                <button id="panel-toggle" class="md:hidden w-7 h-7 flex items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 text-xs" title="Panel ein-/ausblenden" aria-label="Panel ein-/ausblenden" aria-expanded="false" aria-controls="ui-container">&#9652;</button>
-                <button id="help-toggle" class="shrink-0 w-7 h-7 flex items-center justify-center rounded-full border border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 text-sm font-bold" title="Hilfe &amp; Tastenk&uuml;rzel" aria-label="Hilfe anzeigen">?</button>
+                <button id="panel-toggle" class="md:hidden w-7 h-7 flex items-center justify-center rounded-full border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white text-xs transition-colors" title="Panel ein-/ausblenden" aria-label="Panel ein-/ausblenden" aria-expanded="false" aria-controls="ui-container">&#9652;</button>
+                <button id="help-toggle" class="shrink-0 w-7 h-7 flex items-center justify-center rounded-full border border-white/10 text-slate-400 hover:bg-white/10 hover:text-white text-sm font-bold transition-colors" title="Hilfe &amp; Tastenk&uuml;rzel" aria-label="Hilfe anzeigen">?</button>
             </div>
         </div>
 
         <!-- Tabs -->
-        <div class="flex border-b border-gray-200">
-            <button id="tab-objects" class="tab-btn active flex-1 py-2 text-sm font-semibold">Objekte</button>
-            <button id="tab-config" class="tab-btn inactive flex-1 py-2 text-sm font-semibold">Laderaum</button>
+        <div class="flex gap-1 bg-white/5 border border-white/5 rounded-xl p-1">
+            <button id="tab-objects" class="tab-btn active flex-1 py-1.5 text-sm font-semibold">Objekte</button>
+            <button id="tab-config" class="tab-btn inactive flex-1 py-1.5 text-sm font-semibold">Laderaum</button>
         </div>
 
         <!-- PANEL: OBJECTS -->
         <div id="panel-objects" class="flex flex-col gap-4">
 
             <!-- Snapping Toggle -->
-            <label for="toggle-snap" class="flex items-center space-x-2 cursor-pointer bg-slate-50 p-3 rounded-lg border border-slate-200 hover:bg-slate-100 transition-colors">
-                <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-600 focus:ring-blue-500 h-4 w-4 cursor-pointer">
-                <span class="text-xs font-semibold text-slate-700">Einrasten (Fl&auml;che/Raster) &amp; Kollisionen aktiv</span>
+            <label for="toggle-snap" class="flex items-center space-x-2 cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-500 bg-white/10 border-white/20 focus:ring-blue-400 focus:ring-offset-0 h-4 w-4 cursor-pointer">
+                <span class="text-xs font-semibold text-slate-300">Einrasten (Fl&auml;che/Raster) &amp; Kollisionen aktiv</span>
             </label>
 
             <!-- Standard Objects (rendered from src/library.js by ui.js) -->
             <div>
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Standard-Bibliothek</h2>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Standard-Bibliothek</h2>
                 <div id="standard-library-list" class="grid grid-cols-1 gap-2"></div>
             </div>
 
             <!-- Custom Object Generator -->
-            <div class="p-3 bg-slate-50 border border-slate-200 rounded-lg">
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-3">Eigenes Objekt</h2>
+            <div class="p-3 bg-white/5 border border-white/10 rounded-xl">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-3">Eigenes Objekt</h2>
                 <form id="custom-object-form" novalidate>
                     <div class="mb-3">
-                        <label for="custom-name" class="block text-[10px] text-slate-500 font-bold mb-1">Name (optional)</label>
-                        <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
+                        <label for="custom-name" class="block text-[10px] text-slate-400 font-bold mb-1">Name (optional)</label>
+                        <input type="text" id="custom-name" placeholder="Eigenes Objekt" maxlength="40" class="w-full text-sm text-slate-100 placeholder-slate-500 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
                     </div>
                     <label for="custom-fixed" class="flex items-center gap-2 mb-3 cursor-pointer">
-                        <input type="checkbox" id="custom-fixed" class="rounded text-slate-600 focus:ring-slate-500 h-3.5 w-3.5 cursor-pointer">
-                        <span class="text-[10px] text-slate-500 font-semibold">Fest verbaut (Möbel, Tank &ndash; unbeweglich, kein Zuladungsgewicht)</span>
+                        <input type="checkbox" id="custom-fixed" class="rounded text-slate-400 bg-white/10 border-white/20 focus:ring-slate-400 focus:ring-offset-0 h-3.5 w-3.5 cursor-pointer">
+                        <span class="text-[10px] text-slate-400 font-semibold">Fest verbaut (Möbel, Tank &ndash; unbeweglich, kein Zuladungsgewicht)</span>
                     </label>
                     <div class="grid grid-cols-4 gap-2 mb-3">
                         <div>
-                            <label for="custom-w" class="block text-[10px] text-slate-500 font-bold mb-1">Breite (cm)</label>
-                            <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <p id="custom-w-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                            <label for="custom-w" class="block text-[10px] text-slate-400 font-bold mb-1">Breite (cm)</label>
+                            <input type="number" id="custom-w" value="50" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <p id="custom-w-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-h" class="block text-[10px] text-slate-500 font-bold mb-1">Höhe (cm)</label>
-                            <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <p id="custom-h-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                            <label for="custom-h" class="block text-[10px] text-slate-400 font-bold mb-1">Höhe (cm)</label>
+                            <input type="number" id="custom-h" value="40" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <p id="custom-h-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-d" class="block text-[10px] text-slate-500 font-bold mb-1">Tiefe (cm)</label>
-                            <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <p id="custom-d-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                            <label for="custom-d" class="block text-[10px] text-slate-400 font-bold mb-1">Tiefe (cm)</label>
+                            <input type="number" id="custom-d" value="80" min="1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <p id="custom-d-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                         <div>
-                            <label for="custom-weight" class="block text-[10px] text-slate-500 font-bold mb-1">Gewicht (kg)</label>
-                            <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono border border-slate-300 rounded px-2 py-1 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
-                            <p id="custom-weight-error" class="text-[9px] text-red-600 mt-0.5 min-h-[1.1em]"></p>
+                            <label for="custom-weight" class="block text-[10px] text-slate-400 font-bold mb-1">Gewicht (kg)</label>
+                            <input type="number" id="custom-weight" value="5" min="0.1" step="0.1" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                            <p id="custom-weight-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                     </div>
                     <div class="flex items-end gap-2">
                         <div>
-                            <label for="custom-c" class="block text-[10px] text-slate-500 font-bold mb-1">Farbe</label>
-                            <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded border border-slate-300 cursor-pointer p-0.5 bg-white">
+                            <label for="custom-c" class="block text-[10px] text-slate-400 font-bold mb-1">Farbe</label>
+                            <input type="color" id="custom-c" value="#10b981" class="h-9 w-12 rounded-lg border border-white/10 cursor-pointer bg-white/5">
                         </div>
-                        <button type="submit" id="add-custom" class="flex-1 h-9 bg-slate-800 text-white text-xs font-semibold rounded-md hover:bg-slate-700 shadow-sm">Generieren</button>
+                        <button type="submit" id="add-custom" class="flex-1 h-9 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-semibold rounded-lg hover:from-blue-400 hover:to-indigo-500 shadow-lg shadow-blue-950/40">Generieren</button>
                     </div>
                 </form>
             </div>
 
             <!-- Object list (inspector) — rendered/updated by ui.js's renderObjectList() -->
             <div>
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Platzierte Objekte</h2>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Platzierte Objekte</h2>
                 <div id="object-list" class="flex flex-col gap-1 max-h-48 overflow-y-auto pr-0.5"></div>
             </div>
 
             <!-- Stats & Clear -->
-            <div class="flex flex-col gap-2 pt-2 border-t border-slate-200">
-                <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+            <div class="flex flex-col gap-2 pt-2 border-t border-white/10">
+                <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
                     <span>Plazierte Objekte:</span>
-                    <span id="obj-count" class="bg-slate-200 text-slate-800 px-2 py-0.5 rounded-full text-xs">0</span>
+                    <span id="obj-count" class="bg-white/10 text-slate-200 px-2 py-0.5 rounded-full text-xs">0</span>
                 </div>
-                <div class="flex justify-between items-center text-sm font-semibold text-slate-700">
+                <div class="flex justify-between items-center text-sm font-semibold text-slate-300">
                     <span>Gesamtgewicht:</span>
                     <span><span id="total-weight" class="transition-colors">0.0</span> / <span id="max-payload-label">400</span> kg</span>
                 </div>
@@ -130,8 +138,8 @@
                     <span>Schwerpunkt:</span>
                     <span id="cog-info">–</span>
                 </div>
-                <p id="payload-warning" class="hidden text-[11px] text-red-600 font-semibold bg-red-50 border border-red-200 rounded-md px-2 py-1.5"></p>
-                <button id="clear-all" class="w-full py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 text-sm font-semibold">Alle entfernen</button>
+                <p id="payload-warning" class="hidden text-[11px] text-red-400 font-semibold bg-red-500/10 border border-red-500/20 rounded-lg px-2 py-1.5"></p>
+                <button id="clear-all" class="w-full py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-sm font-semibold">Alle entfernen</button>
             </div>
         </div>
 
@@ -140,118 +148,118 @@
 
             <!-- Vehicle presets (rendered from src/vehicles.js by ui.js) -->
             <div>
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400 mb-2">Fahrzeug-Vorlagen</h2>
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Fahrzeug-Vorlagen</h2>
                 <div id="vehicle-preset-list" class="grid grid-cols-1 gap-2"></div>
-                <p class="text-[9px] text-slate-400 mt-1">Circa-Werte als Ausgangspunkt &ndash; kein Ersatz f&uuml;r das Datenblatt Ihres Fahrzeugs.</p>
+                <p class="text-[9px] text-slate-500 mt-1">Circa-Werte als Ausgangspunkt &ndash; kein Ersatz f&uuml;r das Datenblatt Ihres Fahrzeugs.</p>
             </div>
 
             <!-- Dimension Sliders -->
             <div class="space-y-3">
                 <div>
-                    <label for="van-len" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                        Gesamtlänge <span class="font-normal text-slate-500 font-mono"><span id="val-len">330</span>cm</span>
+                    <label for="van-len" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Gesamtlänge <span class="font-normal text-slate-400 font-mono"><span id="val-len">330</span>cm</span>
                     </label>
-                    <input type="range" id="van-len" min="200" max="500" step="10" value="330" class="w-full accent-blue-600">
+                    <input type="range" id="van-len" min="200" max="500" step="10" value="330" class="w-full accent-blue-500">
                 </div>
-                <div class="bg-blue-50/50 p-2 rounded-lg border border-blue-100">
-                    <label for="van-front-len" class="flex justify-between text-xs font-semibold text-blue-800 mb-1">
-                        Länge Vollbreite (Vorn) <span class="font-normal text-blue-600 font-mono"><span id="val-front-len">160</span>cm</span>
+                <div class="bg-blue-500/10 p-2 rounded-lg border border-blue-500/20">
+                    <label for="van-front-len" class="flex justify-between text-xs font-semibold text-blue-300 mb-1">
+                        Länge Vollbreite (Vorn) <span class="font-normal text-blue-300/80 font-mono"><span id="val-front-len">160</span>cm</span>
                     </label>
-                    <input type="range" id="van-front-len" min="0" max="500" step="10" value="160" class="w-full accent-blue-500">
-                    <p class="text-[9px] text-blue-600/80 mt-1 uppercase font-bold tracking-wider">Bereich ohne Radkästen</p>
-                </div>
-                <div>
-                    <label for="van-height" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                        Gesamthöhe <span class="font-normal text-slate-500 font-mono"><span id="val-height">190</span>cm</span>
-                    </label>
-                    <input type="range" id="van-height" min="120" max="250" step="10" value="190" class="w-full accent-blue-600">
+                    <input type="range" id="van-front-len" min="0" max="500" step="10" value="160" class="w-full accent-blue-400">
+                    <p class="text-[9px] text-blue-300/70 mt-1 uppercase font-bold tracking-wider">Bereich ohne Radkästen</p>
                 </div>
                 <div>
-                    <label for="van-width-max" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                        Breite (Maximal) <span class="font-normal text-slate-500 font-mono"><span id="val-width-max">180</span>cm</span>
+                    <label for="van-height" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Gesamthöhe <span class="font-normal text-slate-400 font-mono"><span id="val-height">190</span>cm</span>
                     </label>
-                    <input type="range" id="van-width-max" min="140" max="240" step="5" value="180" class="w-full accent-blue-600">
+                    <input type="range" id="van-height" min="120" max="250" step="10" value="190" class="w-full accent-blue-500">
+                </div>
+                <div>
+                    <label for="van-width-max" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Breite (Maximal) <span class="font-normal text-slate-400 font-mono"><span id="val-width-max">180</span>cm</span>
+                    </label>
+                    <input type="range" id="van-width-max" min="140" max="240" step="5" value="180" class="w-full accent-blue-500">
                 </div>
             </div>
 
             <!-- Radkästen Sliders -->
-            <div class="pt-3 border-t border-slate-200 space-y-3">
-                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Radkästen & Verengung</h2>
+            <div class="pt-3 border-t border-white/10 space-y-3">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Radkästen & Verengung</h2>
                 <div>
-                    <label for="van-width-min" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                        Breite Unten <span class="font-normal text-slate-500 font-mono"><span id="val-width-min">130</span>cm</span>
+                    <label for="van-width-min" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Breite Unten <span class="font-normal text-slate-400 font-mono"><span id="val-width-min">130</span>cm</span>
                     </label>
                     <input type="range" id="van-width-min" min="80" max="160" step="5" value="130" class="w-full accent-emerald-500">
                 </div>
                 <div>
-                    <label for="van-arch-h" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                        Höhe Radkästen <span class="font-normal text-slate-500 font-mono"><span id="val-arch-h">45</span>cm</span>
+                    <label for="van-arch-h" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Höhe Radkästen <span class="font-normal text-slate-400 font-mono"><span id="val-arch-h">45</span>cm</span>
                     </label>
                     <input type="range" id="van-arch-h" min="10" max="80" step="5" value="45" class="w-full accent-emerald-500">
                 </div>
             </div>
 
             <!-- Payload limit -->
-            <div class="pt-3 border-t border-slate-200">
-                <label for="van-payload" class="flex justify-between text-xs font-semibold text-slate-700 mb-1">
-                    Max. Zuladung <span class="font-normal text-slate-500 font-mono"><span id="val-payload">400</span>kg</span>
+            <div class="pt-3 border-t border-white/10">
+                <label for="van-payload" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                    Max. Zuladung <span class="font-normal text-slate-400 font-mono"><span id="val-payload">400</span>kg</span>
                 </label>
-                <input type="range" id="van-payload" min="50" max="2000" step="10" value="400" class="w-full accent-amber-600">
-                <p class="text-[9px] text-slate-400 mt-1">Richtwert zur Warnung &ndash; keine echte Fahrzeugachslast-Berechnung.</p>
+                <input type="range" id="van-payload" min="50" max="2000" step="10" value="400" class="w-full accent-amber-500">
+                <p class="text-[9px] text-slate-500 mt-1">Richtwert zur Warnung &ndash; keine echte Fahrzeugachslast-Berechnung.</p>
             </div>
         </div>
 
         <!-- HISTORY: Undo/Redo — always visible, not tab-scoped -->
         <div class="flex gap-2">
-            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
-            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
+            <button id="undo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5" title="Rückgängig (Strg+Z)">↶ Rückgängig</button>
+            <button id="redo-btn" disabled class="flex-1 py-1.5 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/5" title="Wiederholen (Strg+Y)">↷ Wiederholen</button>
         </div>
 
         <!-- PROJECT: Save/Load/Reset (localStorage) + Export/Import (JSON file) — always visible, not tab-scoped -->
-        <div class="pt-2 border-t border-slate-200 flex flex-col gap-2">
-            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Projekt</h2>
+        <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
+            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Projekt</h2>
             <div class="flex gap-2">
-                <button id="save-config" class="flex-1 py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 text-xs font-semibold">Speichern</button>
-                <button id="load-config" class="flex-1 py-2 bg-slate-50 text-slate-700 border border-slate-200 rounded-md hover:bg-slate-100 hover:border-slate-300 text-xs font-semibold">Laden</button>
-                <button id="reset-config" class="flex-1 py-2 bg-red-50 text-red-600 border border-red-200 rounded-md hover:bg-red-100 hover:border-red-300 text-xs font-semibold">Reset</button>
+                <button id="save-config" class="flex-1 py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold">Speichern</button>
+                <button id="load-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Laden</button>
+                <button id="reset-config" class="flex-1 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-lg hover:bg-red-500/20 hover:border-red-500/30 text-xs font-semibold">Reset</button>
             </div>
             <div class="flex gap-2">
-                <button id="export-config" class="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold">Export (.json)</button>
-                <label for="import-config-file" class="flex-1 py-2 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold text-center cursor-pointer">Import (.json)</label>
+                <button id="export-config" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Export (.json)</button>
+                <label for="import-config-file" class="flex-1 py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold text-center cursor-pointer">Import (.json)</label>
                 <input type="file" id="import-config-file" accept="application/json,.json" class="hidden">
             </div>
-            <button id="export-packing-list" class="w-full py-2 bg-white text-slate-600 border border-slate-200 rounded-md hover:bg-slate-50 hover:border-slate-300 text-xs font-semibold">Packliste (.txt)</button>
-            <p id="persistence-status" class="text-[11px] text-emerald-600 font-semibold h-4"></p>
+            <button id="export-packing-list" class="w-full py-2 bg-white/5 text-slate-300 border border-white/10 rounded-lg hover:bg-white/10 hover:border-white/20 text-xs font-semibold">Packliste (.txt)</button>
+            <p id="persistence-status" class="text-[11px] text-emerald-400 font-semibold h-4"></p>
         </div>
 
         <!-- NAMED PROJECTS: multiple independently saved layouts (localStorage), on top of the single autosave slot above -->
-        <div class="pt-2 border-t border-slate-200 flex flex-col gap-2">
-            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-400">Gespeicherte Projekte</h2>
-            <button id="save-as-project" class="w-full py-2 bg-blue-50 text-blue-700 border border-blue-200 rounded-md hover:bg-blue-100 hover:border-blue-300 text-xs font-semibold">Speichern als&hellip;</button>
+        <div class="pt-2 border-t border-white/10 flex flex-col gap-2">
+            <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Gespeicherte Projekte</h2>
+            <button id="save-as-project" class="w-full py-2 bg-blue-500/10 text-blue-300 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 hover:border-blue-500/30 text-xs font-semibold">Speichern als&hellip;</button>
             <div id="project-list" class="flex flex-col gap-1 max-h-40 overflow-y-auto"></div>
         </div>
     </div>
 
     <!-- Help modal — hidden by default, opened via the "?" button in the header (id="help-toggle") -->
-    <div id="help-modal" class="hidden fixed inset-0 z-20 items-center justify-center bg-black/40 p-4">
-        <div class="bg-white rounded-xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-y-auto p-5">
+    <div id="help-modal" class="hidden fixed inset-0 z-20 items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+        <div class="bg-slate-900 border border-white/10 rounded-2xl shadow-2xl max-w-sm w-full max-h-[80vh] overflow-y-auto p-5">
             <div class="flex items-center justify-between mb-3">
-                <h2 class="text-sm font-bold text-slate-800">Hilfe &amp; Tastenk&uuml;rzel</h2>
-                <button id="help-close" class="text-slate-400 hover:text-slate-700 text-xl leading-none px-1" aria-label="Schlie&szlig;en">&times;</button>
+                <h2 class="text-sm font-bold text-white">Hilfe &amp; Tastenk&uuml;rzel</h2>
+                <button id="help-close" class="text-slate-500 hover:text-white text-xl leading-none px-1" aria-label="Schlie&szlig;en">&times;</button>
             </div>
-            <div class="text-[11px] text-slate-600 leading-relaxed">
-                <p class="mb-1"><span class="font-bold">Maus:</span> Drag & Drop zum Bewegen.</p>
-                <p class="mb-1"><span class="font-bold">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole heben/senken/sperren/l&ouml;schen direkt.</p>
-                <p class="mb-1"><span class="font-bold">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
-                <p class="mb-1"><span class="font-bold">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd> (90°).</p>
-                <p class="mb-1"><span class="font-bold">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>.</p>
-                <p class="mb-1"><span class="font-bold">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">D</kbd>.</p>
-                <p class="mb-1"><span class="font-bold">Bewegen (Tastatur):</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↓</kbd> (hoch/runter), <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">←</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">→</kbd> (links/rechts), <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Umschalt</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">↓</kbd> (vor/zurück) — je 5cm, komplett ohne Maus möglich.</p>
-                <p class="mb-1"><span class="font-bold">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
-                <p class="mb-1"><span class="font-bold">Fest verbaut:</span> Checkbox im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo; &ndash; f&uuml;r Bett, Tank &amp; Co., die permanent im Fahrzeug verbaut sind. Belegt weiterhin Platz, z&auml;hlt aber nicht zur Zuladung und kann nicht verschoben, gedreht, entsperrt, dupliziert oder gel&ouml;scht werden (graue Kontur).</p>
-                <p class="mb-1"><span class="font-bold">Mehrfachauswahl:</span> <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Umschalt</kbd>+Klick f&uuml;gt ein Objekt hinzu/entfernt es, <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Umschalt</kbd>+Ziehen &uuml;ber leerer Fl&auml;che w&auml;hlt per Rahmen (blaue Kontur). Klick auf leere Fl&auml;che hebt die Auswahl auf, <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Esc</kbd> ebenfalls.</p>
-                <p class="mb-1"><span class="font-bold">Gruppieren:</span> Bei &gt;1 ausgew&auml;hltem Objekt bewegen (Ziehen), rotieren (<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">R</kbd>) und l&ouml;schen (<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Entf</kbd>) die ganze Gruppe.</p>
-                <p><span class="font-bold">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white border border-slate-300 rounded shadow-sm text-slate-800 font-mono">Y</kbd>.</p>
+            <div class="text-[11px] text-slate-400 leading-relaxed">
+                <p class="mb-1"><span class="font-bold text-slate-200">Maus:</span> Drag & Drop zum Bewegen.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole heben/senken/sperren/l&ouml;schen direkt.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd> (90°).</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">D</kbd>.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Bewegen (Tastatur):</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↓</kbd> (hoch/runter), <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">←</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">→</kbd> (links/rechts), <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↓</kbd> (vor/zurück) — je 5cm, komplett ohne Maus möglich.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Fest verbaut:</span> Checkbox im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo; &ndash; f&uuml;r Bett, Tank &amp; Co., die permanent im Fahrzeug verbaut sind. Belegt weiterhin Platz, z&auml;hlt aber nicht zur Zuladung und kann nicht verschoben, gedreht, entsperrt, dupliziert oder gel&ouml;scht werden (graue Kontur).</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Mehrfachauswahl:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Klick f&uuml;gt ein Objekt hinzu/entfernt es, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Ziehen &uuml;ber leerer Fl&auml;che w&auml;hlt per Rahmen (blaue Kontur). Klick auf leere Fl&auml;che hebt die Auswahl auf, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Esc</kbd> ebenfalls.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Gruppieren:</span> Bei &gt;1 ausgew&auml;hltem Objekt bewegen (Ziehen), rotieren (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd>) und l&ouml;schen (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>) die ganze Gruppe.</p>
+                <p><span class="font-bold text-slate-200">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Y</kbd>.</p>
             </div>
         </div>
     </div>
