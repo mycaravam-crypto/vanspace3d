@@ -12,6 +12,7 @@ export const DEFAULT_WEIGHT = 5;
 const DEFAULT_EDGE_COLOR = 0x000000;
 const LOCKED_EDGE_COLOR = 0xef4444; // same red family as the "action rejected" flash
 const SELECTED_EDGE_COLOR = 0x3b82f6; // blue — multi-selection (see selection.js)
+const FIXED_EDGE_COLOR = 0x78716c; // warm stone gray — permanent, not a "you can't touch this right now" red
 
 // ==========================================
 // OBJECT MANAGEMENT
@@ -64,20 +65,34 @@ export function flashReject(obj) {
     }, 150);
 }
 
-// Edge-outline color, precedence locked > selected > default. Both
+// Edge-outline color, precedence fixed > locked > selected > default. Both
 // toggleLock() below and selection.js's mutators call this after flipping
-// their respective userData flag, so the two states always compose
-// correctly regardless of which changed most recently.
+// their respective userData flag, so the states always compose correctly
+// regardless of which changed most recently. `fixed` outranks `locked` (even
+// though a fixed object is always also locked, see addBox()) so a permanent
+// built-in fixture reads visually distinct from cargo you've merely locked
+// yourself and could unlock again.
 export function refreshObjectAppearance(obj) {
     const edges = obj.children[0];
     if (!edges || !edges.material) return;
-    const color = obj.userData.locked
-        ? LOCKED_EDGE_COLOR
-        : (obj.userData.selected ? SELECTED_EDGE_COLOR : DEFAULT_EDGE_COLOR);
+    const color = obj.userData.fixed
+        ? FIXED_EDGE_COLOR
+        : (obj.userData.locked
+            ? LOCKED_EDGE_COLOR
+            : (obj.userData.selected ? SELECTED_EDGE_COLOR : DEFAULT_EDGE_COLOR));
     edges.material.color.setHex(color);
 }
 
-export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null) {
+// `options.fixed` marks a permanent, built-in fixture (a bed platform, water
+// tank, etc.) rather than movable cargo: it spawns already locked — and
+// stays locked forever, see toggleLock() below — carries no weight (it's
+// part of the van's own structure, not payload you're deciding whether to
+// bring, so it's excluded from the weight/COG totals the same way any
+// zero-weight object already is), and can't be duplicated (see
+// duplicateObject() below). It still occupies space like any other object,
+// so cargo can't be placed inside it.
+export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null, options = {}) {
+    const { fixed = false } = options;
     const geo = new THREE.BoxGeometry(w, h, d);
     const mat = new THREE.MeshStandardMaterial({
         color: colorHex,
@@ -90,15 +105,16 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null)
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
-    mesh.userData.weight = (Number.isFinite(weight) && weight > 0) ? weight : DEFAULT_WEIGHT;
-    mesh.userData.locked = false;
+    mesh.userData.weight = fixed ? 0 : ((Number.isFinite(weight) && weight > 0) ? weight : DEFAULT_WEIGHT);
+    mesh.userData.locked = fixed;
+    mesh.userData.fixed = fixed;
     mesh.userData.selected = false;
     mesh.userData.label = (typeof label === 'string' && label.trim()) ? label.trim() : 'Objekt';
 
     // Better edges
     const objEdges = new THREE.EdgesGeometry(geo);
     const objLine = new THREE.LineSegments(objEdges, new THREE.LineBasicMaterial({
-        color: DEFAULT_EDGE_COLOR, linewidth: 1, transparent: true, opacity: 0.5,
+        color: fixed ? FIXED_EDGE_COLOR : DEFAULT_EDGE_COLOR, linewidth: 1, transparent: true, opacity: 0.5,
     }));
     mesh.add(objLine);
 
@@ -121,7 +137,14 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null)
 // Creates a copy of obj with the same dimensions/color/weight, offset
 // slightly so it doesn't spawn exactly overlapping the original. The copy is
 // always unlocked (regardless of the source), so it can be placed right away.
+// Refuses to duplicate a fixed fixture — "another one of this built-in water
+// tank" isn't a meaningful cargo item — and flashes it red instead.
 export function duplicateObject(obj) {
+    if (obj.userData.fixed) {
+        flashReject(obj);
+        return null;
+    }
+
     const { width, height, depth } = obj.geometry.parameters;
     const color = obj.material.color.getHex();
     const weight = obj.userData.weight ?? DEFAULT_WEIGHT;
@@ -134,9 +157,15 @@ export function duplicateObject(obj) {
 }
 
 // Flips obj's locked state and updates its visual indicator. Returns the new
-// locked state, or undefined if obj isn't currently tracked.
+// locked state, or undefined if obj isn't currently tracked. A fixed fixture
+// is permanently locked — it never unlocks, since that's what distinguishes
+// it from cargo you've merely chosen to lock for now.
 export function toggleLock(obj) {
     if (!obj || !objects.includes(obj)) return undefined;
+    if (obj.userData.fixed) {
+        flashReject(obj);
+        return obj.userData.locked;
+    }
     obj.userData.locked = !obj.userData.locked;
     refreshObjectAppearance(obj);
     return obj.userData.locked;
@@ -177,26 +206,39 @@ export function clearUnlockedObjects() {
     updateStats();
 }
 
-// Moves obj up/down by deltaY (meters), clamped to the van bounds and
-// (when snapEnabled) rolled back on collision — the same rules as dragging.
-// Returns false without moving if obj is locked or the move was rejected.
-export function moveVertical(obj, deltaY, snapEnabled) {
+// Moves obj by delta (meters) along a single axis ('x', 'y', or 'z'),
+// clamped to the van bounds and (when snapEnabled) rolled back on collision —
+// the same rules as dragging. Returns false without moving if obj is locked
+// or the move was rejected. Shared by moveVertical (Y) and moveHorizontal
+// (X/Z) below, which are just this with the axis fixed.
+function moveAxis(obj, axis, delta, snapEnabled) {
     if (!obj) return false;
     if (obj.userData.locked) {
         flashReject(obj);
         return false;
     }
 
-    const originalY = obj.position.y;
-    obj.position.y += deltaY;
+    const original = obj.position[axis];
+    obj.position[axis] += delta;
     clampToVan(obj, obj.position);
 
     if (snapEnabled && checkCollision(obj)) {
-        obj.position.y = originalY;
+        obj.position[axis] = original;
         flashReject(obj);
         return false;
     }
     return true;
+}
+
+export function moveVertical(obj, deltaY, snapEnabled) {
+    return moveAxis(obj, 'y', deltaY, snapEnabled);
+}
+
+// Nudges obj left/right (axis 'x') or forward/back (axis 'z') — the keyboard
+// counterpart to moveVertical for the other two axes, so an object can be
+// positioned entirely without a mouse/touch drag.
+export function moveHorizontal(obj, axis, delta, snapEnabled) {
+    return moveAxis(obj, axis, delta, snapEnabled);
 }
 
 export function rotate90(obj, snapEnabled) {

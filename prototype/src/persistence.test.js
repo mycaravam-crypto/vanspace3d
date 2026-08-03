@@ -224,6 +224,32 @@ describe('loadConfig', () => {
         expect(objects[0].userData.locked).toBe(false);
     });
 
+    it('round-trips a fixed obstacle as fixed, locked, and zero-weight', () => {
+        addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Wassertank', { fixed: true });
+        saveConfig();
+        clearAllObjects();
+
+        loadConfig();
+
+        expect(objects[0].userData.fixed).toBe(true);
+        expect(objects[0].userData.locked).toBe(true);
+        expect(objects[0].userData.weight).toBe(0);
+    });
+
+    it('treats a missing fixed field on an old save as not fixed', () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: 1,
+            vanState: { ...DEFAULT_VAN_STATE },
+            objects: [
+                { w: 0.6, h: 0.32, d: 0.4, color: 0x64748b, position: { x: 0, y: 0.16, z: 0 } }, // no fixed field
+            ],
+        }));
+
+        loadConfig();
+
+        expect(objects[0].userData.fixed).toBe(false);
+    });
+
     it('falls back to DEFAULT_WEIGHT for a missing or invalid weight field (old saves without it)', () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             version: 1,
@@ -281,6 +307,18 @@ describe('generatePackingListText / exportPackingListToFile', () => {
     it('does not flag an unlocked object', () => {
         addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
         expect(generatePackingListText()).not.toContain('[gesperrt]');
+    });
+
+    it('shows "fest verbaut" instead of a weight/lock flag for a fixed obstacle', () => {
+        addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Wassertank', { fixed: true });
+
+        const text = generatePackingListText();
+
+        // Exact line match confirms no trailing weight/kg or [gesperrt] flag
+        // on the per-item line itself (the overall "Gesamtgewicht: 0.0kg"
+        // total further down is still legitimate — this fixture is the only
+        // object and correctly contributes no weight to that total).
+        expect(text).toContain('  1. Wassertank — 60x30x40cm — fest verbaut\n');
     });
 
     it('shows total weight against the payload limit and the center of gravity', () => {

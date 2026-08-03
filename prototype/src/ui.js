@@ -278,6 +278,24 @@ const CUSTOM_WEIGHT_FIELD = { id: 'custom-weight', errorId: 'custom-weight-error
 const isSaneDimension = (v) => Number.isFinite(v) && v > 0 && v <= 10;
 const isSaneWeight = (v) => Number.isFinite(v) && v > 0 && v <= 1000;
 
+// "Fest verbaut" toggles the custom-object form between generating movable
+// cargo (the default) and a permanent built-in fixture (bed platform, water
+// tank, ...) — addBox()'s `fixed` option handles the actual weight/lock
+// semantics; this just disables the now-inapplicable weight field and clears
+// any stale error on it so a leftover "Gewicht: bitte ..." message doesn't
+// linger once weight stops being asked for.
+function initFixedToggle() {
+    const fixedCheckbox = document.getElementById('custom-fixed');
+    const weightInput = document.getElementById(CUSTOM_WEIGHT_FIELD.id);
+    if (!fixedCheckbox || !weightInput) return;
+
+    fixedCheckbox.addEventListener('change', () => {
+        weightInput.disabled = fixedCheckbox.checked;
+        weightInput.classList.toggle('opacity-50', fixedCheckbox.checked);
+        if (fixedCheckbox.checked) setCustomFieldError(CUSTOM_WEIGHT_FIELD, '');
+    });
+}
+
 function setCustomFieldError(field, message) {
     const input = document.getElementById(field.id);
     const errorEl = document.getElementById(field.errorId);
@@ -290,6 +308,7 @@ function setCustomFieldError(field, message) {
 
 function initObjectPanel() {
     renderStandardLibrary();
+    initFixedToggle();
 
     // Wrapped in a <form> (index.html) so pressing Enter in any field submits
     // it, same as clicking "Generieren".
@@ -301,6 +320,8 @@ function initObjectPanel() {
         const c = document.getElementById('custom-c').value;
         const rawName = document.getElementById('custom-name').value.trim();
         const label = rawName || 'Eigenes Objekt';
+        const fixedEl = document.getElementById('custom-fixed');
+        const isFixed = !!(fixedEl && fixedEl.checked);
 
         let firstInvalidId = null;
         CUSTOM_DIMENSION_FIELDS.forEach((field, i) => {
@@ -308,9 +329,14 @@ function initObjectPanel() {
             setCustomFieldError(field, ok ? '' : `${field.label}: bitte 1-1000 cm.`);
             if (!ok) firstInvalidId = firstInvalidId || field.id;
         });
-        const weightOk = isSaneWeight(rawWeight);
-        setCustomFieldError(CUSTOM_WEIGHT_FIELD, weightOk ? '' : 'Gewicht: bitte 0.1-1000 kg.');
-        if (!weightOk) firstInvalidId = firstInvalidId || CUSTOM_WEIGHT_FIELD.id;
+        // A fixed fixture carries no weight (addBox() forces it to 0
+        // regardless of what's entered here), so the field is skipped
+        // entirely rather than validated against a value that won't be used.
+        if (!isFixed) {
+            const weightOk = isSaneWeight(rawWeight);
+            setCustomFieldError(CUSTOM_WEIGHT_FIELD, weightOk ? '' : 'Gewicht: bitte 0.1-1000 kg.');
+            if (!weightOk) firstInvalidId = firstInvalidId || CUSTOM_WEIGHT_FIELD.id;
+        }
 
         if (firstInvalidId) {
             document.getElementById(firstInvalidId).focus();
@@ -319,7 +345,11 @@ function initObjectPanel() {
 
         const [w, h, d] = dims;
         captureUndoPoint();
-        addBox(w, h, d, c, rawWeight, label);
+        if (isFixed) {
+            addBox(w, h, d, c, rawWeight, label, { fixed: true });
+        } else {
+            addBox(w, h, d, c, rawWeight, label);
+        }
         refreshHistoryButtons();
     });
 
@@ -360,20 +390,23 @@ function renderObjectList() {
     container.innerHTML = objects.map((obj, i) => {
         const { width, height, depth } = obj.geometry.parameters;
         const label = escapeHtml(obj.userData.label || 'Objekt');
+        const fixed = !!obj.userData.fixed;
         const locked = !!obj.userData.locked;
         const selected = !!obj.userData.selected;
         const weight = obj.userData.weight ?? 0;
         const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
+        const meta = fixed ? `${dims} &middot; fest verbaut` : `${dims} &middot; ${weight}kg`;
         const rowBorder = selected ? 'border-blue-400 ring-1 ring-blue-300' : 'border-slate-200';
+        const lockTitle = fixed ? 'Fest verbaut (dauerhaft gesperrt)' : 'Sperren/Entsperren (L)';
         return `
             <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 bg-white border ${rowBorder} rounded-md hover:border-blue-300 hover:bg-blue-50/50">
                 <button type="button" data-action="select" data-idx="${i}" class="flex-1 min-w-0 text-left py-0.5">
                     <div class="text-xs font-medium text-slate-700 truncate">${label}</div>
-                    <div class="text-[10px] text-slate-400 font-mono">${dims} &middot; ${weight}kg</div>
+                    <div class="text-[10px] text-slate-400 font-mono">${meta}</div>
                 </button>
                 <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&uarr;</button>
                 <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-300 hover:text-slate-600 text-xs leading-none font-bold">&darr;</button>
-                <button type="button" data-action="lock" data-idx="${i}" title="Sperren/Entsperren (L)" class="p-1.5 rounded ${locked ? 'text-red-500 hover:text-red-600' : 'text-slate-300 hover:text-slate-500'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
+                <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded ${locked ? 'text-red-500 hover:text-red-600' : 'text-slate-300 hover:text-slate-500'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
                 <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-300 hover:text-red-500">${ICON_TRASH}</button>
             </div>`;
     }).join('');
@@ -394,6 +427,7 @@ function renderObjectList() {
                 moveVertical(obj, action === 'up' ? 0.05 : -0.05, isSnapEnabled());
                 refreshHistoryButtons();
             } else if (action === 'lock') {
+                if (obj.userData.fixed) { flashReject(obj); return; } // permanently locked, nothing to toggle
                 captureUndoPoint();
                 toggleLock(obj);
                 refreshHistoryButtons();

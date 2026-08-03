@@ -5,7 +5,7 @@ import { camera, renderer } from './scene.js';
 import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision, findFaceSnap } from './collision.js';
 import {
-    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, flashReject,
+    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
 } from './objects.js';
 import {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
@@ -466,18 +466,32 @@ window.addEventListener('keydown', (e) => {
         return;
     }
 
-    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    // Full keyboard control over an object's position, not just vertical:
+    // ArrowLeft/Right nudge left/right (X), plain ArrowUp/Down nudge up/down
+    // (Y, unchanged from before), and Shift+ArrowUp/Down nudge forward/back
+    // (Z) — the third axis needs a modifier since the four arrow keys are
+    // already spoken for by the other two axes.
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault(); // don't scroll the page
         if (!activeObj) return;
         if (activeObj.userData.locked) { flashReject(activeObj); return; }
         if (!e.repeat) captureUndoPoint(); // one undo point per key-hold gesture, not per repeat tick
-        moveVertical(activeObj, e.key === 'ArrowUp' ? 0.05 : -0.05, isSnapEnabled());
+
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            moveHorizontal(activeObj, 'x', e.key === 'ArrowRight' ? 0.05 : -0.05, isSnapEnabled());
+        } else if (e.shiftKey) {
+            moveHorizontal(activeObj, 'z', e.key === 'ArrowUp' ? -0.05 : 0.05, isSnapEnabled());
+        } else {
+            moveVertical(activeObj, e.key === 'ArrowUp' ? 0.05 : -0.05, isSnapEnabled());
+        }
+
         if (!e.repeat) refreshHistoryButtons();
         return;
     }
 
     if (e.key === 'l' || e.key === 'L') {
         if (!activeObj) return;
+        if (activeObj.userData.fixed) { flashReject(activeObj); return; } // permanently locked, nothing to toggle
         captureUndoPoint();
         toggleLock(activeObj);
         refreshHistoryButtons();
@@ -505,6 +519,7 @@ window.addEventListener('keydown', (e) => {
     if (mod && e.key.toLowerCase() === 'd') {
         e.preventDefault(); // avoid the browser's "bookmark this page" shortcut
         if (!activeObj) return;
+        if (activeObj.userData.fixed) { flashReject(activeObj); return; }
         captureUndoPoint();
         const copy = duplicateObject(activeObj);
         dragControls.dispatchEvent({ type: 'hoveroff', object: activeObj });
