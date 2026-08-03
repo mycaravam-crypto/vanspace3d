@@ -18,14 +18,14 @@ beforeEach(() => {
 describe('buildVanGeometry', () => {
     it('builds front zone, rear zones, floor and wheel arches for the default van', () => {
         buildVanGeometry();
-        // frontBox + frontFloor + rearLower + rearUpper + rearFloor + 2 arches
+        // frontBox + frontFloor + rearLower + upperZone + rearFloor + 2 arches
         expect(vanGroup.children).toHaveLength(7);
     });
 
     it('omits the front zone entirely when frontLength is 0', () => {
         vanState.frontLength = 0;
         buildVanGeometry();
-        // rearLower + rearUpper + rearFloor + 2 arches, no front pieces
+        // rearLower + upperZone + rearFloor + 2 arches, no front pieces
         expect(vanGroup.children).toHaveLength(5);
     });
 
@@ -39,7 +39,7 @@ describe('buildVanGeometry', () => {
     it('omits the wheel arches when narrowWidth equals maxWidth', () => {
         vanState.narrowWidth = vanState.maxWidth;
         buildVanGeometry();
-        // frontBox + frontFloor + rearLower + rearUpper + rearFloor, no arches
+        // frontBox + frontFloor + rearLower + upperZone + rearFloor, no arches
         expect(vanGroup.children).toHaveLength(5);
     });
 
@@ -57,7 +57,7 @@ describe('buildVanGeometry', () => {
     it('treats a frontLength at/below the 0.01 threshold as "no front zone"', () => {
         vanState.frontLength = 0.005; // below the > 0.01 guard in buildVanGeometry
         buildVanGeometry();
-        // rearLower + rearUpper + rearFloor + 2 arches, no front pieces
+        // rearLower + upperZone + rearFloor + 2 arches, no front pieces
         expect(vanGroup.children).toHaveLength(5);
     });
 
@@ -74,7 +74,21 @@ describe('buildVanGeometry', () => {
         expect(vanGroup.children).toHaveLength(5); // no arches
     });
 
-    it('sizes the front zone box from maxWidth/maxHeight/frontLength', () => {
+    it('sizes the front zone box down to the wheel-arch line when a rear zone also exists', () => {
+        buildVanGeometry();
+        const frontBox = vanGroup.children[0];
+        // Only up to archHeight, not the full maxHeight — the space above
+        // that is covered once by the shared upper zone (see below) instead
+        // of a second box whose face would double-render against it.
+        expect(frontBox.geometry.parameters).toMatchObject({
+            width: vanState.maxWidth,
+            height: vanState.archHeight,
+            depth: vanState.frontLength,
+        });
+    });
+
+    it('sizes the front zone box at full maxHeight when there is no rear zone', () => {
+        vanState.frontLength = vanState.length;
         buildVanGeometry();
         const frontBox = vanGroup.children[0];
         expect(frontBox.geometry.parameters).toMatchObject({
@@ -84,12 +98,18 @@ describe('buildVanGeometry', () => {
         });
     });
 
-    it('sizes the rear-upper zone height as maxHeight minus archHeight', () => {
+    it('sizes the upper zone height as maxHeight minus archHeight', () => {
         buildVanGeometry();
-        // Order of insertion: frontBox, frontFloor, rearLower, rearUpper, ...
-        const rearUpper = vanGroup.children[3];
-        expect(rearUpper.geometry.parameters.height).toBeCloseTo(vanState.maxHeight - vanState.archHeight);
-        expect(rearUpper.position.y).toBeCloseTo(vanState.archHeight + (vanState.maxHeight - vanState.archHeight) / 2);
+        // Order of insertion: frontBox, frontFloor, rearLower, upperZone, ...
+        const upperZone = vanGroup.children[3];
+        expect(upperZone.geometry.parameters.height).toBeCloseTo(vanState.maxHeight - vanState.archHeight);
+        expect(upperZone.position.y).toBeCloseTo(vanState.archHeight + (vanState.maxHeight - vanState.archHeight) / 2);
+    });
+
+    it('spans the upper zone across the van\'s full length, not just the rear section, so it shares no seam with the front box', () => {
+        buildVanGeometry();
+        const upperZone = vanGroup.children[3];
+        expect(upperZone.geometry.parameters.depth).toBeCloseTo(vanState.length);
     });
 
     it('re-clamps existing placed objects into the rebuilt van bounds', () => {

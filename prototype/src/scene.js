@@ -35,8 +35,15 @@ dirLight.shadow.camera.bottom = -10;
 dirLight.shadow.bias = -0.0005; // Prevent shadow acne
 scene.add(dirLight);
 
+// Soft cool fill from the opposite side so faces angled away from dirLight
+// don't read as flat black silhouettes. No shadow map of its own (would
+// double the shadow cost for a light this subtle) — it's a fill, not a key.
+const fillLight = new THREE.DirectionalLight(0x93c5fd, 0.35);
+fillLight.position.set(-8, 6, -6);
+scene.add(fillLight);
+
 // Environment Details
-const gridHelper = new THREE.GridHelper(20, 40, 0x334155, 0x1e293b);
+const gridHelper = new THREE.GridHelper(20, 40, 0x475569, 0x334155);
 gridHelper.position.y = -0.01;
 scene.add(gridHelper);
 
