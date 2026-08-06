@@ -1,0 +1,37 @@
+# Caddy site block for vanspace.vi0lins.de.
+#
+# The server (vi0lins.de) already runs Caddy for another site
+# (kuestenmaus.de), so this reuses that instead of installing nginx.
+# Caddy handles HTTPS (Let's Encrypt) automatically — no certbot needed.
+#
+# One-time setup on the server (needs sudo, run interactively):
+#
+#   sudo mkdir -p /var/www/vanspace3d/releases
+#   sudo chown -R mycaravam:mycaravam /var/www/vanspace3d
+#   sudo tee -a /etc/caddy/Caddyfile <<'EOF'
+#
+#   vanspace.vi0lins.de {
+#           root * /var/www/vanspace3d/current
+#           file_server
+#           encode gzip
+#   }
+#   EOF
+#   sudo systemctl reload caddy
+#
+# After that, deploys are just:
+#
+#   VANSPACE_DEPLOY_HOST=mycaravam@vi0lins.de \
+#   VANSPACE_DEPLOY_PATH=/var/www/vanspace3d \
+#     ./deploy/deploy.sh
+#
+# and rollbacks:
+#
+#   VANSPACE_DEPLOY_HOST=mycaravam@vi0lins.de \
+#   VANSPACE_DEPLOY_PATH=/var/www/vanspace3d \
+#     ./deploy/rollback.sh
+
+vanspace.vi0lins.de {
+        root * /var/www/vanspace3d/current
+        file_server
+        encode gzip
+}
