@@ -1,0 +1,35 @@
+name: Deploy prototype
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "prototype/**"
+      - "deploy/deploy.sh"
+      - ".github/workflows/deploy.yml"
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VANSPACE_DEPLOY_SSH_KEY }}
+
+      - name: Trust server host key
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H vi0lins.de >> ~/.ssh/known_hosts
+
+      - name: Deploy
+        env:
+          VANSPACE_DEPLOY_HOST: ${{ secrets.VANSPACE_DEPLOY_HOST }}
+          VANSPACE_DEPLOY_PATH: ${{ secrets.VANSPACE_DEPLOY_PATH }}
+        run: ./deploy/deploy.sh
