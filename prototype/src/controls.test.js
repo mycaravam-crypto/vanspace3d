@@ -10,8 +10,10 @@ vi.mock('./scene.js', () => ({
 }));
 
 let snapEnabled = true;
+let labelsEnabled = true;
 vi.mock('./ui.js', () => ({
     isSnapEnabled: () => snapEnabled,
+    isLabelsEnabled: () => labelsEnabled,
     syncSlidersFromState: vi.fn(),
     refreshHistoryButtons: vi.fn(),
 }));
@@ -57,7 +59,7 @@ document.body.innerHTML = '<button id="viewport-rotate-btn" class="hidden"></but
     + '<button id="viewport-rotate-x-btn" class="hidden"></button>';
 const {
     orbitControls, dragControls, selectObject, setCameraView, projectToScreen, pointInRect,
-    handlePointerDown, handlePointerMove, handlePointerUp, updateRotateHandle,
+    handlePointerDown, handlePointerMove, handlePointerUp, updateRotateHandle, updateObjectLabels, objectLabelsLayer,
 } = await import('./controls.js');
 const rotateHandle = document.getElementById('viewport-rotate-btn');
 const rotateXHandle = document.getElementById('viewport-rotate-x-btn');
@@ -858,6 +860,49 @@ describe('viewport rotate handles', () => {
 
             expect(rotateHandle.classList.contains('hidden')).toBe(true);
             expect(rotateXHandle.classList.contains('hidden')).toBe(true);
+        });
+    });
+
+    describe('updateObjectLabels', () => {
+        beforeEach(() => { labelsEnabled = true; });
+
+        it('creates one visible label per tracked object, showing its name', () => {
+            const a = makeTrackedBox();
+            a.userData.label = 'Kiste A';
+            a.position.set(0, 0, -1); // in view of the origin-positioned test camera
+            const b = makeTrackedBox();
+            b.userData.label = 'Kiste B';
+            b.position.set(0, 0, -1);
+
+            updateObjectLabels();
+
+            const texts = Array.from(objectLabelsLayer.children).map((el) => el.textContent);
+            expect(texts).toEqual(expect.arrayContaining(['Kiste A', 'Kiste B']));
+            expect(objectLabelsLayer.style.display).not.toBe('none');
+        });
+
+        it('removes a label once its object is no longer tracked', () => {
+            const mesh = makeTrackedBox();
+            mesh.position.set(0, 0, -1);
+            updateObjectLabels();
+            expect(objectLabelsLayer.children.length).toBe(1);
+
+            objects.length = 0; // simulate removeObject()/clearAllObjects() dropping it from tracking
+            updateObjectLabels();
+            expect(objectLabelsLayer.children.length).toBe(0);
+        });
+
+        it('hides the whole layer when the labels toggle is off', () => {
+            const mesh = makeTrackedBox();
+            mesh.position.set(0, 0, -1);
+
+            labelsEnabled = false;
+            updateObjectLabels();
+            expect(objectLabelsLayer.style.display).toBe('none');
+
+            labelsEnabled = true;
+            updateObjectLabels();
+            expect(objectLabelsLayer.style.display).not.toBe('none');
         });
     });
 });

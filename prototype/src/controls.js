@@ -11,7 +11,7 @@ import {
 import {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
 } from './selection.js';
-import { isSnapEnabled, syncSlidersFromState, refreshHistoryButtons } from './ui.js';
+import { isSnapEnabled, isLabelsEnabled, syncSlidersFromState, refreshHistoryButtons } from './ui.js';
 import { captureUndoPoint, undo, redo } from './history.js';
 
 // ==========================================
@@ -511,6 +511,10 @@ Object.assign(labelLayer.style, {
     position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '15',
 });
 document.body.appendChild(labelLayer);
+// Exported for tests — the layer isn't reachable via document.getElementById()
+// once a test's beforeEach resets document.body.innerHTML, since that detaches
+// (without destroying) this module-scoped node.
+export const objectLabelsLayer = labelLayer;
 
 // obj -> its label <div>. A plain Map (not WeakMap) since updateObjectLabels()
 // below needs to iterate existing entries to prune ones for removed objects.
@@ -533,6 +537,12 @@ function labelAccentClass(obj) {
 // (creating/removing DOM nodes as objects are added/removed/undone) and
 // repositions every visible label to its object's current screen position.
 export function updateObjectLabels() {
+    if (!isLabelsEnabled()) {
+        labelLayer.style.display = 'none';
+        return;
+    }
+    labelLayer.style.display = '';
+
     const rect = renderer.domElement.getBoundingClientRect();
 
     const live = new Set(objects);

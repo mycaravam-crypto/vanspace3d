@@ -90,6 +90,15 @@
                 <span class="text-xs font-semibold text-slate-300">Einrasten (Fl&auml;che/Raster) &amp; Kollisionen aktiv</span>
             </label>
 
+            <!-- Name-label Toggle — hides/shows the floating object-name tags
+                 in the 3D view (see updateObjectLabels() in controls.js). A
+                 plain checked-state read, not persisted, same as the snap
+                 toggle above. -->
+            <label for="toggle-labels" class="flex items-center space-x-2 cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                <input type="checkbox" id="toggle-labels" checked class="rounded text-blue-500 bg-white/10 border-white/20 focus:ring-blue-400 focus:ring-offset-0 h-4 w-4 cursor-pointer">
+                <span class="text-xs font-semibold text-slate-300">Objektnamen in 3D-Ansicht anzeigen</span>
+            </label>
+
             <!-- Standard Objects (rendered from src/library.js by ui.js) -->
             <div>
                 <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Standard-Bibliothek</h2>

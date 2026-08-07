@@ -21,6 +21,10 @@ export function isSnapEnabled() {
     return document.getElementById('toggle-snap').checked;
 }
 
+export function isLabelsEnabled() {
+    return document.getElementById('toggle-labels').checked;
+}
+
 function initTabs() {
     const tabObjects = document.getElementById('tab-objects');
     const tabConfig = document.getElementById('tab-config');
