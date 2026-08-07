@@ -15,6 +15,38 @@ const SELECTED_EDGE_COLOR = 0x3b82f6; // blue — multi-selection (see selection
 const FIXED_EDGE_COLOR = 0x78716c; // warm stone gray — permanent, not a "you can't touch this right now" red
 
 // ==========================================
+// X-RAY VIEW — a global toggle (not per-object, not persisted/undo-tracked,
+// same as camera position) that makes every object's fill translucent so one
+// hidden behind/inside another is still visible without moving anything.
+// ==========================================
+const XRAY_OPACITY = 0.35;
+let xrayEnabled = false;
+
+export function isXrayEnabled() {
+    return xrayEnabled;
+}
+
+// Edge outlines are left alone — they stay fully opaque either way, which is
+// exactly what keeps overlapping boxes distinguishable in x-ray mode.
+function applyXray(mat) {
+    mat.transparent = xrayEnabled;
+    mat.opacity = xrayEnabled ? XRAY_OPACITY : 1;
+    // Matches createVanZone()'s own translucent van-shell materials in
+    // van.js — depthWrite:false while transparent avoids draw-order
+    // artifacts between overlapping see-through boxes.
+    mat.depthWrite = !xrayEnabled;
+}
+
+// Applies (or clears) x-ray translucency across every currently tracked
+// object. New objects pick up the current state automatically (see addBox()
+// below), so toggling this once covers everything already placed and
+// anything added/loaded/undone afterward.
+export function setXrayEnabled(enabled) {
+    xrayEnabled = enabled;
+    objects.forEach((obj) => applyXray(obj.material));
+}
+
+// ==========================================
 // OBJECT MANAGEMENT
 // ==========================================
 function updateStats() {
@@ -102,6 +134,7 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null,
         polygonOffsetFactor: 1,
         polygonOffsetUnits: 1,
     });
+    applyXray(mat); // new objects pick up whatever x-ray state is currently active
     const mesh = new THREE.Mesh(geo, mat);
     mesh.castShadow = true;
     mesh.receiveShadow = true;

@@ -2,7 +2,7 @@ import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject,
+    rotateX90, flashReject, setXrayEnabled,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -587,6 +587,25 @@ function initCameraToolbar() {
     });
 }
 
+// X-ray toggle, next to the camera-view presets — a persistent on/off state
+// (unlike the momentary view buttons above), so it needs its own pressed
+// styling instead of just firing once. Not persisted/undo-tracked, same as
+// the camera position itself; setXrayEnabled() (objects.js) re-applies to
+// every tracked object and any added/loaded/undone afterward.
+function initXrayToggle() {
+    const btn = document.getElementById('cam-xray');
+    if (!btn) return;
+
+    let active = false;
+    btn.addEventListener('click', () => {
+        active = !active;
+        setXrayEnabled(active);
+        btn.classList.toggle('text-blue-300', active);
+        btn.classList.toggle('bg-blue-500/10', active);
+        btn.setAttribute('aria-pressed', String(active));
+    });
+}
+
 // ==========================================
 // UNDO / REDO
 // ==========================================
@@ -805,6 +824,7 @@ export function initUI() {
     initPersistence();
     initNamedProjects();
     initCameraToolbar();
+    initXrayToggle();
     initHelpModal();
 
     // Resume the last saved project on startup if there is one, otherwise

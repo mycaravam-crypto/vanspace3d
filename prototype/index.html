@@ -28,6 +28,14 @@
         <button id="cam-reset" class="flex items-center px-2 py-1.5 text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border-l border-white/10 ml-0.5 pl-2.5 transition-colors" title="Ansicht zur&uuml;cksetzen" aria-label="Ansicht zur&uuml;cksetzen">
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"></path><path d="M3 3v5h5"></path></svg>
         </button>
+        <!-- X-ray toggle — a persistent on/off state, not a one-shot view
+             preset like the buttons above, so it's visually separated by its
+             own divider and gets an active/pressed style (see initXrayToggle()
+             in ui.js) instead of just firing on click. -->
+        <button id="cam-xray" type="button" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border-l border-white/10 ml-0.5 pl-2.5 transition-colors" title="R&ouml;ntgenansicht (Objekte durchsichtig)" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>R&ouml;ntgen</span>
+        </button>
     </div>
 
     <!-- Floating rotate/color handles — track the single selected object's
@@ -322,6 +330,7 @@
                 <p class="mb-1"><span class="font-bold text-slate-200">Objektliste:</span> Klick w&auml;hlt aus (wie Hover in 3D), Symbole bearbeiten/drehen/heben/senken/sperren/l&ouml;schen direkt.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Ma&szlig;e &auml;ndern:</span> Stift-Symbol in der Objektliste &ouml;ffnet ein Formular f&uuml;r Breite/H&ouml;he/Tiefe &ndash; nur f&uuml;r entsperrte Objekte.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">R&ouml;ntgenansicht:</span> Button oben rechts (neben den Kamera-Ansichten) macht alle Objekte durchsichtig, damit auch verdeckte Objekte sichtbar bleiben &ndash; erneut klicken schaltet zur&uuml;ck.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd> (90°), oder auf dem Handy das Dreh-Symbol in der Objektliste antippen.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Farbe &auml;ndern:</span> Objekt ausw&auml;hlen &ndash; das Farbtropfen-Symbol &uuml;ber dem Objekt &ouml;ffnet einen Farbw&auml;hler (nur f&uuml;r entsperrte Objekte).</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>.</p>

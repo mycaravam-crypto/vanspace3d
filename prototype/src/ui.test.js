@@ -12,6 +12,7 @@ vi.mock('./objects.js', () => ({
     rotate90: vi.fn(() => true),
     rotateX90: vi.fn(() => true),
     flashReject: vi.fn(),
+    setXrayEnabled: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
 vi.mock('./persistence.js', () => ({
@@ -45,7 +46,7 @@ const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject,
+    rotateX90, flashReject, setXrayEnabled,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
@@ -121,6 +122,7 @@ function mountFixture() {
             <button id="cam-front"></button>
             <button id="cam-side"></button>
             <button id="cam-reset"></button>
+            <button id="cam-xray" aria-pressed="false"></button>
         </div>
 
         <!-- No production min/max here on purpose (beyond a generous max, to
@@ -174,6 +176,7 @@ beforeEach(() => {
     rotate90.mockClear();
     rotateX90.mockClear();
     flashReject.mockClear();
+    setXrayEnabled.mockClear();
     selectObject.mockClear();
     saveConfig.mockClear();
     saveConfig.mockReturnValue(true);
@@ -858,6 +861,23 @@ describe('camera view toolbar', () => {
             document.getElementById(id).click();
             expect(setCameraView).toHaveBeenCalledWith(view);
         });
+    });
+});
+
+describe('x-ray toggle', () => {
+    it('toggles setXrayEnabled and the button\'s pressed state on each click', () => {
+        const btn = document.getElementById('cam-xray');
+        expect(btn.getAttribute('aria-pressed')).toBe('false');
+
+        btn.click();
+        expect(setXrayEnabled).toHaveBeenLastCalledWith(true);
+        expect(btn.getAttribute('aria-pressed')).toBe('true');
+        expect(btn.classList.contains('text-blue-300')).toBe(true);
+
+        btn.click();
+        expect(setXrayEnabled).toHaveBeenLastCalledWith(false);
+        expect(btn.getAttribute('aria-pressed')).toBe('false');
+        expect(btn.classList.contains('text-blue-300')).toBe(false);
     });
 });
 
