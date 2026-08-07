@@ -320,6 +320,22 @@ function rebuildGeometry(obj, snapEnabled, w, h, d) {
     return true;
 }
 
+// Changes obj's fill color (the box material, not the edge outline — that's
+// driven separately by refreshObjectAppearance() based on lock/selection/
+// fixed state). Accepts anything THREE.Color#set understands (a '#rrggbb'
+// string from a <input type="color">, a hex number, ...). Returns false
+// without changing anything if obj is locked or isn't tracked — same guard
+// as every other mutator here.
+export function setObjectColor(obj, color) {
+    if (!obj || !objects.includes(obj)) return false;
+    if (obj.userData.locked) {
+        flashReject(obj);
+        return false;
+    }
+    obj.material.color.set(color);
+    return true;
+}
+
 // Rotates obj 90 degrees around the Y (vertical) axis — swaps its width and
 // depth, height unchanged. E.g. turning a couch to face a different wall.
 export function rotate90(obj, snapEnabled) {
