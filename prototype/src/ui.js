@@ -8,6 +8,7 @@ import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
 import {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
+    sanitizeFilename,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } from './persistence.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
@@ -654,7 +655,9 @@ function initPersistence() {
     });
 
     document.getElementById('export-config').addEventListener('click', () => {
-        exportToFile();
+        const name = prompt('Dateiname für den Export:', 'vanspace3d-projekt');
+        if (name === null) return; // cancelled
+        exportToFile(sanitizeFilename(name, 'vanspace3d-projekt', 'json'));
         showStatus('Exportiert ✓');
     });
 

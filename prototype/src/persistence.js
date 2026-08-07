@@ -232,6 +232,17 @@ function downloadTextFile(content, filename, mimeType) {
     URL.revokeObjectURL(url);
 }
 
+// Turns free-typed user input into a safe download filename: strips
+// characters that are invalid in a filename on Windows/macOS/Linux, trims
+// the result, falls back to `fallback` if that leaves nothing, and ensures
+// the given extension is present (without double-adding it if the user
+// already typed one).
+export function sanitizeFilename(name, fallback, extension) {
+    const cleaned = (name || '').replace(/[<>:"/\\|?*\x00-\x1f]/g, '').trim();
+    const base = cleaned || fallback;
+    return new RegExp(`\\.${extension}$`, 'i').test(base) ? base : `${base}.${extension}`;
+}
+
 export function exportToFile(filename = 'vanspace3d-project.json') {
     downloadTextFile(JSON.stringify(serializeState(), null, 2), filename, 'application/json');
 }

@@ -10,7 +10,7 @@ vi.mock('./scene.js', () => ({
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const { addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT } = await import('./objects.js');
 const {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
     generatePackingListText, exportPackingListToFile, importFromText,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
@@ -340,6 +340,35 @@ describe('generatePackingListText / exportPackingListToFile', () => {
     it('exportPackingListToFile triggers a Blob download without throwing', () => {
         addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
         expect(() => exportPackingListToFile()).not.toThrow();
+    });
+});
+
+describe('sanitizeFilename', () => {
+    it('appends the extension when missing', () => {
+        expect(sanitizeFilename('mein-projekt', 'fallback', 'json')).toBe('mein-projekt.json');
+    });
+
+    it('does not double up an extension the user already typed', () => {
+        expect(sanitizeFilename('mein-projekt.json', 'fallback', 'json')).toBe('mein-projekt.json');
+    });
+
+    it('matches the extension case-insensitively so it is not duplicated', () => {
+        expect(sanitizeFilename('mein-projekt.JSON', 'fallback', 'json')).toBe('mein-projekt.JSON');
+    });
+
+    it('strips characters that are invalid in a filename', () => {
+        expect(sanitizeFilename('a/b\\c:d*e?f"g<h>i|j', 'fallback', 'json')).toBe('abcdefghij.json');
+    });
+
+    it('falls back when the input is empty, blank, or only invalid characters', () => {
+        expect(sanitizeFilename('', 'fallback', 'json')).toBe('fallback.json');
+        expect(sanitizeFilename('   ', 'fallback', 'json')).toBe('fallback.json');
+        expect(sanitizeFilename('///', 'fallback', 'json')).toBe('fallback.json');
+        expect(sanitizeFilename(null, 'fallback', 'json')).toBe('fallback.json');
+    });
+
+    it('trims surrounding whitespace', () => {
+        expect(sanitizeFilename('  mein-projekt  ', 'fallback', 'json')).toBe('mein-projekt.json');
     });
 });
 
