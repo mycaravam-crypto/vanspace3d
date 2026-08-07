@@ -9,6 +9,7 @@ vi.mock('./objects.js', () => ({
     removeObject: vi.fn(),
     moveVertical: vi.fn(),
     resizeObject: vi.fn(() => true),
+    rotate90: vi.fn(() => true),
     flashReject: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
@@ -41,7 +42,8 @@ vi.mock('./controls.js', () => ({
 const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, flashReject,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
+    flashReject,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
@@ -166,6 +168,7 @@ beforeEach(() => {
     moveVertical.mockClear();
     resizeObject.mockClear();
     resizeObject.mockReturnValue(true);
+    rotate90.mockClear();
     flashReject.mockClear();
     selectObject.mockClear();
     saveConfig.mockClear();
@@ -652,6 +655,30 @@ describe('object list panel', () => {
         document.querySelector('#object-list button[data-action="up"]').click();
         expect(captureUndoPoint).not.toHaveBeenCalled();
         expect(moveVertical).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the rotate icon rotates the object 90° respecting the snap toggle, and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        document.getElementById('toggle-snap').checked = false;
+
+        document.querySelector('#object-list button[data-action="rotate"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(rotate90).toHaveBeenCalledWith(obj, false);
+    });
+
+    it('clicking rotate on a locked object flashes it instead of rotating it', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="rotate"]').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(rotate90).not.toHaveBeenCalled();
         expect(flashReject).toHaveBeenCalledWith(obj);
     });
 

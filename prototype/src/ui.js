@@ -1,7 +1,8 @@
 import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
-    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, flashReject,
+    addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
+    flashReject,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -389,6 +390,10 @@ const ICON_LOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.5"/></svg>';
 const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7"/></svg>';
 const ICON_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+// Touch/mobile-friendly equivalent of the 'R' keyboard shortcut (rotate90()) —
+// the object list is the only place a phone/tablet user (no keyboard) can
+// trigger a rotation at all.
+const ICON_ROTATE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>';
 
 // Renders the list of placed objects (label, size, weight, lock state) so an
 // object can be found and selected/locked/deleted without hunting for it in
@@ -421,6 +426,7 @@ function renderObjectList() {
                     <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
                 </button>
                 <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
+                <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg;" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
                 <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&uarr;</button>
                 <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&darr;</button>
                 <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
@@ -440,6 +446,11 @@ function renderObjectList() {
                 selectObject(obj);
             } else if (action === 'edit-dims') {
                 openEditDimsModal(obj);
+            } else if (action === 'rotate') {
+                if (obj.userData.locked) { flashReject(obj); return; }
+                captureUndoPoint();
+                rotate90(obj, isSnapEnabled());
+                refreshHistoryButtons();
             } else if (action === 'up' || action === 'down') {
                 if (obj.userData.locked) { flashReject(obj); return; }
                 captureUndoPoint();
