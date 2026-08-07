@@ -31,6 +31,9 @@ vi.mock('./persistence.js', () => ({
     deleteNamedProject: vi.fn(() => true),
     renameNamedProject: vi.fn(() => true),
 }));
+vi.mock('./pdfExport.js', () => ({
+    exportSchematicPdfToFile: vi.fn(),
+}));
 vi.mock('./history.js', () => ({
     captureUndoPoint: vi.fn(),
     undo: vi.fn(() => false),
@@ -53,6 +56,7 @@ const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
     importFromText, listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
+const { exportSchematicPdfToFile } = await import('./pdfExport.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
 const { STANDARD_LIBRARY } = await import('./library.js');
@@ -153,6 +157,7 @@ function mountFixture() {
         <button id="reset-config"></button>
         <button id="export-config"></button>
         <button id="export-packing-list"></button>
+        <button id="export-pdf"></button>
         <input type="file" id="import-config-file">
         <p id="persistence-status"></p>
 
@@ -191,6 +196,7 @@ beforeEach(() => {
     exportToFile.mockClear();
     sanitizeFilename.mockClear();
     exportPackingListToFile.mockClear();
+    exportSchematicPdfToFile.mockClear();
     importFromText.mockClear();
     importFromText.mockReturnValue(true);
     listProjects.mockClear();
@@ -1091,6 +1097,12 @@ describe('project persistence', () => {
         document.getElementById('export-packing-list').click();
         expect(exportPackingListToFile).toHaveBeenCalled();
         expect(document.getElementById('persistence-status').textContent).toMatch(/packliste/i);
+    });
+
+    it('exports the PDF packplan on click and shows a success status', () => {
+        document.getElementById('export-pdf').click();
+        expect(exportSchematicPdfToFile).toHaveBeenCalled();
+        expect(document.getElementById('persistence-status').textContent).toMatch(/pdf/i);
     });
 
     it('imports the selected file, captures an undo point, and re-syncs on success', async () => {
