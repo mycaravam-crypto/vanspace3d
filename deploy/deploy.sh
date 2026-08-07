@@ -5,6 +5,10 @@
 # nginx serves from $REMOTE_PATH/current, so the switch is zero-downtime and
 # a bad deploy is a one-command rollback (see deploy/rollback.sh).
 #
+# Each run also bumps prototype/package.json's patch version and commits that
+# bump locally (not pushed) — this is the "vX.Y.Z" shown subtly in the app UI,
+# so it advances with every release. Push the commit yourself when ready.
+#
 # Usage:
 #   VANSPACE_DEPLOY_HOST=user@your-server.example \
 #   VANSPACE_DEPLOY_PATH=/var/www/vanspace3d \
@@ -25,11 +29,19 @@ RELEASE_PATH="$REMOTE_PATH/releases/$TIMESTAMP"
 
 cd "$(dirname "$0")/../prototype"
 
+echo "Bumping version..."
+NEW_VERSION="$(npm version patch --no-git-tag-version | sed 's/^v//')"
+echo "Version: $NEW_VERSION"
+
 echo "Installing dependencies..."
 npm ci
 
 echo "Building..."
 npm run build
+
+echo "Committing version bump..."
+git add package.json package-lock.json
+git commit -m "Release v$NEW_VERSION"
 
 echo "Creating release dir $RELEASE_PATH ..."
 ssh "$HOST" "mkdir -p '$RELEASE_PATH'"
@@ -43,4 +55,4 @@ ssh "$HOST" "ln -sfn '$RELEASE_PATH' '$REMOTE_PATH/current'"
 echo "Pruning old releases (keeping last $KEEP_RELEASES) ..."
 ssh "$HOST" "cd '$REMOTE_PATH/releases' && ls -1t | tail -n +$((KEEP_RELEASES + 1)) | xargs -r rm -rf --"
 
-echo "Done. Live release: $TIMESTAMP"
+echo "Done. Live release: $TIMESTAMP (v$NEW_VERSION)"
