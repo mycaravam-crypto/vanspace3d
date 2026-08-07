@@ -1,4 +1,6 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import {
+    describe, it, expect, beforeEach, afterEach, vi,
+} from 'vitest';
 import * as THREE from 'three';
 
 // scene.js creates a real THREE.WebGLRenderer at import time, which needs a
@@ -13,7 +15,7 @@ const { vanState, objects } = await import('./state.js');
 const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
-    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT,
+    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, isXrayEnabled, setXrayEnabled,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -728,5 +730,49 @@ describe('resizeObject', () => {
         const stray = addBox(0.5, 0.5, 0.5, 0x64748b);
         clearAllObjects(); // detaches stray without disposing our spy expectations
         expect(resizeObject(stray, 0.6, 0.6, 0.6, true)).toBe(false);
+    });
+});
+
+describe('x-ray view', () => {
+    afterEach(() => setXrayEnabled(false)); // module-level flag — leave it as the app's own default
+
+    it('starts disabled, with objects fully opaque', () => {
+        expect(isXrayEnabled()).toBe(false);
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
+        expect(mesh.material.transparent).toBe(false);
+        expect(mesh.material.opacity).toBe(1);
+    });
+
+    it('makes every currently tracked object translucent, without touching its edge outline', () => {
+        const a = addBox(0.5, 0.5, 0.5, 0x64748b);
+        const b = addBox(0.4, 0.4, 0.4, 0x64748b);
+        const edgeColorBefore = a.children[0].material.opacity;
+
+        setXrayEnabled(true);
+
+        expect(isXrayEnabled()).toBe(true);
+        [a, b].forEach((obj) => {
+            expect(obj.material.transparent).toBe(true);
+            expect(obj.material.opacity).toBeLessThan(1);
+            expect(obj.material.depthWrite).toBe(false);
+        });
+        expect(a.children[0].material.opacity).toBe(edgeColorBefore); // edges untouched
+    });
+
+    it('restores full opacity when turned back off', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
+        setXrayEnabled(true);
+        setXrayEnabled(false);
+
+        expect(mesh.material.transparent).toBe(false);
+        expect(mesh.material.opacity).toBe(1);
+        expect(mesh.material.depthWrite).toBe(true);
+    });
+
+    it('applies the current x-ray state to objects created afterward', () => {
+        setXrayEnabled(true);
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
+        expect(mesh.material.transparent).toBe(true);
+        expect(mesh.material.opacity).toBeLessThan(1);
     });
 });
