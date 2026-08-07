@@ -5,17 +5,27 @@ import { DEFAULT_WEIGHT } from './objects.js';
 import { sanitizeFilename } from './persistence.js';
 
 // ==========================================
-// PDF EXPORT — a one-page (or more, if the BOM overflows) "Packplan":
-// a to-scale top-down schematic of the van + placed objects, followed by a
-// bill-of-materials table. Complements the plain-text packing list
-// (generatePackingListText() in persistence.js) with something meant to be
-// printed and taken along, not just read on screen.
+// PDF EXPORT — a "Packplan": page 1 is a to-scale, three-view schematic
+// (top/front/side, like a technical drawing) of the van + placed objects;
+// page 2+ is a bill-of-materials table. Complements the plain-text packing
+// list (generatePackingListText() in persistence.js) with something meant
+// to be printed and taken along, not just read on screen.
+//
+// Three views instead of one matter because a single top-down view can only
+// separate objects that differ in X or Z — two objects stacked at different
+// heights (same X/Z, different Y) are indistinguishable from directly above.
+// All three views share one scale, so a size read off any one of them is
+// consistent with the others (like a real technical drawing).
 // ==========================================
 const PAGE_MARGIN = 15; // mm
-const SCHEMATIC_TOP = 26; // mm — below the title block
-const SCHEMATIC_HEIGHT = 95; // mm — reserved drawing height for the top-down view
-const LEGEND_HEIGHT = 14; // mm — scale bar + compass captions below the drawing
+const TITLE_BOTTOM = 24; // mm — below the title block
+const TOP_VIEW_HEIGHT = 82; // mm — reserved drawing height for the top (floor-plan) view
+const SMALL_VIEW_HEIGHT = 52; // mm — reserved height for the front/side views
+const VIEW_ROW_GAP = 10; // mm — gap between the top view and the front/side row
+const VIEW_COL_GAP = 8; // mm — gap between the front and side views
+const CAPTION_GAP = 5; // mm — space reserved above each view for its caption
 const ROW_HEIGHT = 6; // mm — BOM table row height
+const CLUSTER_EPS_MM = 3; // footprints whose centers land this close together share one call-out
 const BOM_COLUMNS = [
     { label: 'Nr.', x: 0, width: 10 },
     { label: 'Name', x: 10, width: 68 },
@@ -31,11 +41,11 @@ function formatOffsetCm(value, positiveLabel, negativeLabel) {
     return value >= 0 ? `${Math.round(value * 100)}cm ${positiveLabel}` : `${Math.round(-value * 100)}cm ${negativeLabel}`;
 }
 
-// The van's stepped top-down footprint as a list of {x, z, w, d} rectangles
-// (van-space meters; x = left/right, z = front/back; w/d are full extents,
-// not half-extents) — the same front-wide/rear-narrow/wheel-arch shape
-// buildVanGeometry() (van.js) draws in 3D, flattened for the 2D schematic.
-// Exported for testing; pure function of vanState.
+// The van's stepped top-down (floor-level) footprint as a list of
+// {x, z, w, d} rectangles (van-space meters; x = left/right, z = front/back;
+// w/d are full extents, not half-extents) — the same front-wide/rear-narrow/
+// wheel-arch shape buildVanGeometry() (van.js) draws in 3D, flattened to the
+// floor plan. Exported for testing; pure function of vanState.
 export function vanFootprintRects() {
     const rects = [];
     const zFrontStart = -vanState.length / 2;
@@ -86,84 +96,163 @@ function drawTitleBlock(doc) {
     doc.text(`Laderaum ${dims} · erstellt am ${dateStr}`, PAGE_MARGIN, 19);
 }
 
-// Draws the to-scale top-down schematic (van outline + numbered object
-// footprints + center-of-gravity marker) and returns the y-coordinate (mm)
-// where the BOM table can safely start.
-function drawSchematic(doc) {
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const availWidth = pageWidth - PAGE_MARGIN * 2;
+function setObjectStyle(doc, obj) {
+    const fixed = !!obj.userData.fixed;
+    const locked = !!obj.userData.locked;
+    doc.setLineDashPattern(locked && !fixed ? [1, 0.7] : [], 0);
+    doc.setLineWidth(fixed || locked ? 0.6 : 0.3);
+    if (fixed) {
+        doc.setDrawColor(...FIXED_RGB);
+        doc.setFillColor(...FIXED_FILL_RGB);
+    } else {
+        const col = obj.material.color;
+        doc.setDrawColor(locked ? LOCKED_RGB[0] : 40, locked ? LOCKED_RGB[1] : 40, locked ? LOCKED_RGB[2] : 40);
+        doc.setFillColor(Math.round(col.r * 255), Math.round(col.g * 255), Math.round(col.b * 255));
+    }
+}
 
-    // mm per meter — whichever axis is tighter sets the scale, so the whole
-    // van fits within the reserved drawing box regardless of its proportions.
-    const scale = Math.min(availWidth / vanState.length, SCHEMATIC_HEIGHT / vanState.maxWidth);
-    const drawW = vanState.length * scale;
-    const drawH = vanState.maxWidth * scale;
-    const originX = PAGE_MARGIN + (availWidth - drawW) / 2; // centered horizontally
-    const originY = SCHEMATIC_TOP;
+// Draws a van-outline rectangle given its center + full extents in this
+// view's (u, v) van-space plane, via the view's own toPage(u, v) point
+// mapping. Reads the two opposite corners rather than assuming which one is
+// page-top-left, since toPage's v-axis direction differs per view (see
+// drawObjectFootprints below for the same reasoning).
+function drawOutlineRect(doc, toPage, u, v, wu, wv) {
+    const a = toPage(u - wu / 2, v - wv / 2);
+    const b = toPage(u + wu / 2, v + wv / 2);
+    return {
+        px: Math.min(a.px, b.px), py: Math.min(a.py, b.py), w: Math.abs(b.px - a.px), h: Math.abs(b.py - a.py),
+    };
+}
 
-    // z (front/back) maps to the page's horizontal axis (front reads left),
-    // x (left/right) maps to the page's vertical axis — a floor plan read
-    // left-to-right as front-to-back of the vehicle.
-    const toPage = (x, z) => ({
-        px: originX + (z + vanState.length / 2) * scale,
-        py: originY + (x + vanState.maxWidth / 2) * scale,
+// Draws every placed object's footprint in one 2D projection of the given
+// view, then — in a *second* pass, after every fill/border is down — draws
+// each footprint's call-out number on top. That ordering (rather than
+// numbering each object right after its own rect, interleaved with the
+// next) is what keeps a number from ever being buried under a
+// later-drawn object's fill.
+//
+// `project(obj)` maps an object to its bounding box *center* + full extents
+// in this view's plane, in van-space meters: {u, v, wu, wv}. `toPage(u, v)`
+// converts a van-space point to a page-mm point; its v-axis direction is up
+// to the view (e.g. "up" on the page can mean increasing OR decreasing
+// van-space height), so the rect is derived from both opposite corners
+// rather than assuming one particular corner is page-top-left.
+function drawObjectFootprints(doc, project, toPage) {
+    const placements = objects.map((obj, i) => {
+        const { u, v, wu, wv } = project(obj);
+        const a = toPage(u - wu / 2, v - wv / 2);
+        const b = toPage(u + wu / 2, v + wv / 2);
+        return {
+            i,
+            obj,
+            px: Math.min(a.px, b.px),
+            py: Math.min(a.py, b.py),
+            w: Math.abs(b.px - a.px),
+            h: Math.abs(b.py - a.py),
+        };
     });
 
-    // Van outline
-    doc.setLineDashPattern([], 0);
-    doc.setLineWidth(0.4);
-    vanFootprintRects().forEach((r) => {
-        const { px, py } = toPage(r.x - r.w / 2, r.z - r.d / 2);
-        const w = r.d * scale;
-        const h = r.w * scale;
-        if (r.arch) {
-            doc.setDrawColor(140, 140, 140);
-            doc.setFillColor(225, 225, 225);
-            doc.rect(px, py, w, h, 'FD');
-        } else {
-            doc.setDrawColor(80, 80, 80);
-            doc.rect(px, py, w, h, 'D');
-        }
-    });
-
-    // Objects, numbered in the same order as the BOM table below so each
-    // footprint can be looked up by its row.
-    objects.forEach((obj, i) => {
-        const { width, height, depth } = obj.geometry.parameters;
-        const { px, py } = toPage(obj.position.x - width / 2, obj.position.z - depth / 2);
-        const w = depth * scale;
-        const h = width * scale;
-        const fixed = !!obj.userData.fixed;
-        const locked = !!obj.userData.locked;
-
-        doc.setLineDashPattern(locked && !fixed ? [1, 0.7] : [], 0);
-        doc.setLineWidth(fixed || locked ? 0.6 : 0.3);
-        if (fixed) {
-            doc.setDrawColor(...FIXED_RGB);
-            doc.setFillColor(...FIXED_FILL_RGB);
-        } else {
-            const col = obj.material.color;
-            doc.setDrawColor(locked ? LOCKED_RGB[0] : 40, locked ? LOCKED_RGB[1] : 40, locked ? LOCKED_RGB[2] : 40);
-            doc.setFillColor(Math.round(col.r * 255), Math.round(col.g * 255), Math.round(col.b * 255));
-        }
+    placements.forEach(({
+        px, py, w, h, obj,
+    }) => {
+        setObjectStyle(doc, obj);
         doc.rect(px, py, w, h, 'FD');
-
-        // Skip the call-out number on a footprint too small to hold it
-        // legibly rather than spilling text outside the box.
-        if (w >= 5 && h >= 4) {
-            doc.setFont('helvetica', 'bold');
-            doc.setFontSize(7);
-            doc.setTextColor(15, 23, 42);
-            doc.text(String(i + 1), px + w / 2, py + h / 2, { align: 'center', baseline: 'middle' });
-        }
     });
     doc.setLineDashPattern([], 0);
     doc.setLineWidth(0.2);
 
-    // Center of gravity marker, same red used for the 3D marker (cog.js).
+    // Footprints whose centers land within CLUSTER_EPS_MM of each other get
+    // one combined "1,2,3" label instead of stacking individually-illegible
+    // digits on top of each other — a simple greedy nearest-neighbor
+    // grouping (not full transitive clustering), which is plenty for the
+    // small clusters that actually occur here (a handful of same-size
+    // objects placed at nearly the same spot).
+    const centers = placements.map((p) => ({ ...p, cx: p.px + p.w / 2, cy: p.py + p.h / 2 }));
+    const used = new Set();
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(15, 23, 42);
+    centers.forEach((p, idx) => {
+        if (used.has(idx)) return;
+        used.add(idx);
+        if (p.w < 5 || p.h < 4) return; // too small to hold a legible number
+        const cluster = [p];
+        centers.forEach((q, jdx) => {
+            if (used.has(jdx)) return;
+            if (Math.hypot(p.cx - q.cx, p.cy - q.cy) <= CLUSTER_EPS_MM) {
+                cluster.push(q);
+                used.add(jdx);
+            }
+        });
+        const text = cluster.map((c) => c.i + 1).join(',');
+        doc.text(text, p.cx, p.cy, { align: 'center', baseline: 'middle' });
+    });
+}
+
+// A single scale (mm per van-meter) shared by all three views, so a
+// distance read off any one of them agrees with the others — the tightest
+// of the three views' own fit constraints wins.
+function computeSharedScale(availWidth, smallViewWidth) {
+    const topScale = Math.min(availWidth / vanState.length, TOP_VIEW_HEIGHT / vanState.maxWidth);
+    const frontScale = Math.min(smallViewWidth / vanState.maxWidth, SMALL_VIEW_HEIGHT / vanState.maxHeight);
+    const sideScale = Math.min(smallViewWidth / vanState.length, SMALL_VIEW_HEIGHT / vanState.maxHeight);
+    return Math.min(topScale, frontScale, sideScale);
+}
+
+function drawCaption(doc, text, x, y) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(51, 65, 85);
+    doc.text(text, x, y);
+}
+
+// Floor-plan (top-down) view: van outline + numbered object footprints +
+// center-of-gravity marker — the only view with enough information (x/z,
+// no height) to place one. z (front/back) maps to the page's horizontal
+// axis (front reads left), x (left/right) to the page's vertical axis.
+function drawTopView(doc, box, scale) {
+    const drawW = vanState.length * scale;
+    const drawH = vanState.maxWidth * scale;
+    const originX = box.x + (box.w - drawW) / 2; // centered within the reserved box
+    const originY = box.y;
+    const toPage = (u, v) => ({ px: originX + (u + vanState.length / 2) * scale, py: originY + (v + vanState.maxWidth / 2) * scale });
+
+    drawCaption(doc, 'Draufsicht', box.x, box.y - 2);
+
+    doc.setLineDashPattern([], 0);
+    doc.setLineWidth(0.4);
+    vanFootprintRects().forEach((r) => {
+        const rect = drawOutlineRect(doc, toPage, r.z, r.x, r.d, r.w);
+        if (r.arch) {
+            doc.setDrawColor(140, 140, 140);
+            doc.setFillColor(225, 225, 225);
+            doc.rect(rect.px, rect.py, rect.w, rect.h, 'FD');
+        } else {
+            doc.setDrawColor(80, 80, 80);
+            doc.rect(rect.px, rect.py, rect.w, rect.h, 'D');
+        }
+    });
+
+    drawObjectFootprints(
+        doc,
+        (obj) => {
+            const { width, depth } = obj.geometry.parameters;
+            return {
+                u: obj.position.z, v: obj.position.x, wu: depth, wv: width,
+            };
+        },
+        toPage,
+    );
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('VORNE', originX + 1, originY + drawH + 4);
+    doc.text('HINTEN', originX + drawW - 1, originY + drawH + 4, { align: 'right' });
+
     const cog = computeCenterOfGravity();
     if (cog) {
-        const { px, py } = toPage(cog.x, cog.z);
+        const { px, py } = toPage(cog.z, cog.x);
         doc.setDrawColor(...LOCKED_RGB);
         doc.setFillColor(255, 255, 255);
         doc.circle(px, py, 1.6, 'FD');
@@ -171,44 +260,110 @@ function drawSchematic(doc) {
         doc.line(px - 2.4, py, px + 2.4, py);
         doc.line(px, py - 2.4, px, py + 2.4);
     }
+}
 
-    // Compass captions along the drawing's edges.
+// Front elevation: looking at the van head-on. x (left/right) maps to the
+// page's horizontal axis, y (height) to the vertical axis — increasing
+// height means decreasing page-y, so the floor reads at the bottom like a
+// real elevation drawing, not the top-view's arbitrary top-to-bottom axis.
+// The van's own outline here is always a plain maxWidth×maxHeight rectangle:
+// the wheel-arch notch (see vanFootprintRects()) only exists in the rear
+// zone at floor height, and the front zone alone already reaches full
+// width at every height, so the head-on silhouette has no visible step.
+function drawFrontView(doc, box, scale) {
+    const drawW = vanState.maxWidth * scale;
+    const drawH = vanState.maxHeight * scale;
+    const originX = box.x + (box.w - drawW) / 2;
+    const originY = box.y + (box.h - drawH);
+    const toPage = (u, v) => ({ px: originX + (u + vanState.maxWidth / 2) * scale, py: originY + (vanState.maxHeight - v) * scale });
+
+    drawCaption(doc, 'Vorderansicht', box.x, box.y - 2);
+
+    doc.setDrawColor(80, 80, 80);
+    doc.setLineWidth(0.4);
+    const outline = drawOutlineRect(doc, toPage, 0, vanState.maxHeight / 2, vanState.maxWidth, vanState.maxHeight);
+    doc.rect(outline.px, outline.py, outline.w, outline.h, 'D');
+
+    drawObjectFootprints(
+        doc,
+        (obj) => {
+            const { width, height } = obj.geometry.parameters;
+            return {
+                u: obj.position.x, v: obj.position.y, wu: width, wv: height,
+            };
+        },
+        toPage,
+    );
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('LINKS', originX + 1, originY + drawH + 4);
+    doc.text('RECHTS', originX + drawW - 1, originY + drawH + 4, { align: 'right' });
+}
+
+// Side elevation: looking at the van from the side, along its length. z
+// (front/back) maps to the page's horizontal axis (front reads left, same
+// convention as the top view), y (height) to the vertical axis (floor at
+// the bottom, same convention as the front view). Also a plain rectangle
+// outline for the same reason as the front view — the wheel-arch notch is
+// a floor-level width constraint that doesn't show in a height/length
+// silhouette either.
+function drawSideView(doc, box, scale) {
+    const drawW = vanState.length * scale;
+    const drawH = vanState.maxHeight * scale;
+    const originX = box.x + (box.w - drawW) / 2;
+    const originY = box.y + (box.h - drawH);
+    const toPage = (u, v) => ({ px: originX + (u + vanState.length / 2) * scale, py: originY + (vanState.maxHeight - v) * scale });
+
+    drawCaption(doc, 'Seitenansicht', box.x, box.y - 2);
+
+    doc.setDrawColor(80, 80, 80);
+    doc.setLineWidth(0.4);
+    const outline = drawOutlineRect(doc, toPage, 0, vanState.maxHeight / 2, vanState.length, vanState.maxHeight);
+    doc.rect(outline.px, outline.py, outline.w, outline.h, 'D');
+
+    drawObjectFootprints(
+        doc,
+        (obj) => {
+            const { depth, height } = obj.geometry.parameters;
+            return {
+                u: obj.position.z, v: obj.position.y, wu: depth, wv: height,
+            };
+        },
+        toPage,
+    );
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6.5);
+    doc.setTextColor(100, 116, 139);
+    doc.text('VORNE', originX + 1, originY + drawH + 4);
+    doc.text('HINTEN', originX + drawW - 1, originY + drawH + 4, { align: 'right' });
+}
+
+// Shared legend, drawn once beneath all three views (they share one scale,
+// so one legend applies to all of them).
+function drawLegend(doc, x, y) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.setTextColor(100, 116, 139);
-    doc.text('VORNE', originX, originY - 2);
-    doc.text('HINTEN', originX + drawW, originY - 2, { align: 'right' });
-    doc.text('LINKS', originX - 2, originY + 3, { align: 'right', angle: 90 });
-    doc.text('RECHTS', originX - 2, originY + drawH, { align: 'right', angle: 90 });
 
-    // Scale bar — a fixed 50cm reference length, positioned under the drawing.
-    const barY = originY + drawH + 6;
-    const barLenM = 0.5;
-    const barLenMm = barLenM * scale;
-    doc.setDrawColor(100, 116, 139);
-    doc.setLineWidth(0.3);
-    doc.line(originX, barY, originX + barLenMm, barY);
-    doc.line(originX, barY - 1, originX, barY + 1);
-    doc.line(originX + barLenMm, barY - 1, originX + barLenMm, barY + 1);
-    doc.text(`${Math.round(barLenM * 100)} cm`, originX + barLenMm + 2, barY + 1);
-
-    // Legend
-    const legendX = originX + barLenMm + 25;
-    doc.setFillColor(214, 211, 209);
+    doc.setFillColor(...FIXED_FILL_RGB);
     doc.setDrawColor(...FIXED_RGB);
-    doc.rect(legendX, barY - 3, 4, 3, 'FD');
-    doc.text('Fest verbaut', legendX + 6, barY);
+    doc.setLineDashPattern([], 0);
+    doc.rect(x, y - 3, 4, 3, 'FD');
+    doc.text('Fest verbaut', x + 6, y);
+
     doc.setLineDashPattern([1, 0.7], 0);
     doc.setDrawColor(...LOCKED_RGB);
     doc.setFillColor(255, 255, 255);
-    doc.rect(legendX + 35, barY - 3, 4, 3, 'FD');
+    doc.rect(x + 35, y - 3, 4, 3, 'FD');
     doc.setLineDashPattern([], 0);
-    doc.text('Gesperrt', legendX + 41, barY);
-    doc.setDrawColor(...LOCKED_RGB);
-    doc.circle(legendX + 62, barY - 1.5, 1.4, 'D');
-    doc.text('Schwerpunkt', legendX + 66, barY);
+    doc.text('Gesperrt', x + 41, y);
 
-    return originY + SCHEMATIC_HEIGHT + LEGEND_HEIGHT;
+    doc.setDrawColor(...LOCKED_RGB);
+    doc.circle(x + 62, y - 1.5, 1.4, 'D');
+    doc.text('Schwerpunkt (nur Draufsicht)', x + 66, y);
 }
 
 function drawBomHeader(doc, y) {
@@ -304,13 +459,38 @@ function drawSummary(doc, y) {
     }
 }
 
-// Builds and downloads the packplan PDF (schematic + BOM). Pure side effect
+// Builds and downloads the packplan PDF: page 1 is the three-view schematic
+// (top/front/side, one shared scale, see drawTopView/drawFrontView/
+// drawSideView above), page 2+ is the BOM table + summary. Pure side effect
 // (triggers a browser download via jsPDF's own save()) — nothing to return.
 export function exportSchematicPdfToFile(filename = 'vanspace3d-packplan.pdf') {
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     drawTitleBlock(doc);
-    const bomStartY = drawSchematic(doc);
-    const bomEndY = drawBom(doc, bomStartY);
+
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const availWidth = pageWidth - PAGE_MARGIN * 2;
+    const smallViewWidth = (availWidth - VIEW_COL_GAP) / 2;
+    const scale = computeSharedScale(availWidth, smallViewWidth);
+
+    const topBox = {
+        x: PAGE_MARGIN, y: TITLE_BOTTOM + CAPTION_GAP, w: availWidth, h: TOP_VIEW_HEIGHT,
+    };
+    drawTopView(doc, topBox, scale);
+
+    const smallRowY = topBox.y + topBox.h + VIEW_ROW_GAP + CAPTION_GAP;
+    const frontBox = {
+        x: PAGE_MARGIN, y: smallRowY, w: smallViewWidth, h: SMALL_VIEW_HEIGHT,
+    };
+    const sideBox = {
+        x: PAGE_MARGIN + smallViewWidth + VIEW_COL_GAP, y: smallRowY, w: smallViewWidth, h: SMALL_VIEW_HEIGHT,
+    };
+    drawFrontView(doc, frontBox, scale);
+    drawSideView(doc, sideBox, scale);
+
+    drawLegend(doc, PAGE_MARGIN, smallRowY + SMALL_VIEW_HEIGHT + 8);
+
+    doc.addPage();
+    const bomEndY = drawBom(doc, PAGE_MARGIN + 5);
     drawSummary(doc, bomEndY + 6);
     doc.save(sanitizeFilename(filename, 'vanspace3d-packplan', 'pdf'));
 }

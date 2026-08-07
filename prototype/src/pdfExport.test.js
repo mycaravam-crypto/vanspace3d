@@ -72,6 +72,17 @@ function makeMesh({
     return mesh;
 }
 
+function texts(doc) {
+    return doc.calls.filter((c) => c[0] === 'text').map((c) => c[1]);
+}
+
+function numberCallouts(doc) {
+    // Schematic call-outs are centered/middle-baseline text, unlike the BOM
+    // table's plain left-aligned "Nr." column (which also prints "1"/"2") —
+    // filtering on the alignment options isolates the footprint numbering.
+    return doc.calls.filter((c) => c[0] === 'text' && c[4] && c[4].align === 'center').map((c) => c[1]);
+}
+
 beforeEach(() => {
     Object.assign(vanState, DEFAULT_VAN_STATE);
     objects.length = 0;
@@ -117,60 +128,69 @@ describe('exportSchematicPdfToFile', () => {
         expect(doc.savedFilename).toMatch(/\.pdf$/);
     });
 
-    // Baseline rect count with nothing placed: the van footprint + the two
-    // always-drawn legend swatches (fixed/locked key), see drawSchematic().
-    const BASELINE_RECT_COUNT = () => vanFootprintRects().length + 2;
+    // Baseline rect count with nothing placed: the top view's van-footprint
+    // rects + one outline rect each for the front/side views' plain
+    // maxWidth×maxHeight / length×maxHeight silhouettes + the two
+    // always-drawn legend swatches (fixed/locked key) — see drawTopView()/
+    // drawFrontView()/drawSideView()/drawLegend().
+    const BASELINE_RECT_COUNT = () => vanFootprintRects().length + 2 + 2;
 
-    it('draws the van footprint + legend rects even with nothing placed', () => {
+    it('draws the van outlines (all three views) + legend rects even with nothing placed', () => {
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
         const rectCalls = doc.calls.filter((c) => c[0] === 'rect');
         expect(rectCalls).toHaveLength(BASELINE_RECT_COUNT());
     });
 
-    it('draws one additional rect per placed object', () => {
+    it('draws one footprint rect per placed object in each of the three views', () => {
         objects.push(makeMesh({ label: 'Kiste A' }), makeMesh({ label: 'Kiste B', x: 0.5 }));
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
         const rectCalls = doc.calls.filter((c) => c[0] === 'rect');
-        expect(rectCalls).toHaveLength(BASELINE_RECT_COUNT() + 2);
+        expect(rectCalls).toHaveLength(BASELINE_RECT_COUNT() + 2 * 3);
     });
 
-    // Schematic call-outs are centered/middle-baseline text, unlike the BOM
-    // table's plain left-aligned "Nr." column — which also prints "1"/"2" —
-    // so filtering on the alignment options is what isolates the footprint
-    // numbering specifically, rather than double-counting both sources.
-    it('numbers each object footprint to match its BOM row', () => {
-        objects.push(makeMesh({ label: 'Kiste A' }), makeMesh({ label: 'Kiste B', x: 0.5 }));
+    it('numbers a well-separated object in every view it appears in', () => {
+        // Positioned far apart on every axis (x, y, z) so it never clusters
+        // with anything else and reliably gets its own call-out in all
+        // three views (top, front, side).
+        objects.push(makeMesh({
+            label: 'Kiste A', x: -0.6, y: 0.5, z: -1.2,
+        }));
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
-        const numberTexts = doc.calls
-            .filter((c) => c[0] === 'text' && c[4] && c[4].align === 'center')
-            .map((c) => c[1]);
-        expect(numberTexts.sort()).toEqual(['1', '2']);
+        const numbers = numberCallouts(doc);
+        expect(numbers).toEqual(['1', '1', '1']);
     });
 
     it('lists every object name in the BOM table', () => {
         objects.push(makeMesh({ label: 'Werkzeugkiste' }), makeMesh({ label: 'Wasserkanister', x: 0.5 }));
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
-        const texts = doc.calls.filter((c) => c[0] === 'text').map((c) => c[1]);
-        expect(texts).toContain('Werkzeugkiste');
-        expect(texts).toContain('Wasserkanister');
+        expect(texts(doc)).toContain('Werkzeugkiste');
+        expect(texts(doc)).toContain('Wasserkanister');
     });
 
     it('shows a placeholder row in the BOM when nothing is placed', () => {
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
-        const texts = doc.calls.filter((c) => c[0] === 'text').map((c) => c[1]);
-        expect(texts).toContain('Keine Objekte platziert.');
+        expect(texts(doc)).toContain('Keine Objekte platziert.');
     });
 
-    it('breaks to a new page once the BOM table overflows the page height', () => {
-        for (let i = 0; i < 40; i += 1) objects.push(makeMesh({ label: `Kiste ${i}` }));
+    it('starts the BOM on its own page, after the schematic', () => {
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
         expect(doc.calls.some((c) => c[0] === 'addPage')).toBe(true);
+    });
+
+    it('breaks to a further new page once the BOM table overflows the page height', () => {
+        for (let i = 0; i < 40; i += 1) objects.push(makeMesh({ label: `Kiste ${i}` }));
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        const addPageCalls = doc.calls.filter((c) => c[0] === 'addPage');
+        // At least one addPage() for the schematic->BOM page break, plus at
+        // least one more for the BOM overflowing onto a third page.
+        expect(addPageCalls.length).toBeGreaterThanOrEqual(2);
     });
 
     it('labels a fixed fixture "Fest verbaut" and a locked object "Gesperrt" in the BOM', () => {
@@ -180,8 +200,28 @@ describe('exportSchematicPdfToFile', () => {
         );
         exportSchematicPdfToFile();
         const doc = jsPDF.instances[0];
-        const texts = doc.calls.filter((c) => c[0] === 'text').map((c) => c[1]);
-        expect(texts).toContain('Fest verbaut');
-        expect(texts).toContain('Gesperrt');
+        expect(texts(doc)).toContain('Fest verbaut');
+        expect(texts(doc)).toContain('Gesperrt');
+    });
+
+    it('captions all three schematic views', () => {
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        expect(texts(doc)).toContain('Draufsicht');
+        expect(texts(doc)).toContain('Vorderansicht');
+        expect(texts(doc)).toContain('Seitenansicht');
+    });
+
+    it('clusters two objects sharing (nearly) the same footprint into one call-out per view, instead of stacking illegible digits', () => {
+        // Same position and dimensions on every axis — as close to a
+        // worst-case overlap as it gets.
+        objects.push(makeMesh({ label: 'Kiste A' }), makeMesh({ label: 'Kiste B' }));
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        const numbers = numberCallouts(doc);
+        // One combined "1,2" call-out per view (top/front/side) rather than
+        // two separate (and, at this exact overlap, perfectly coincident)
+        // "1" and "2" texts.
+        expect(numbers).toEqual(['1,2', '1,2', '1,2']);
     });
 });
