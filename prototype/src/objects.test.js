@@ -12,7 +12,7 @@ const { scene } = await import('./scene.js');
 const { vanState, objects } = await import('./state.js');
 const { checkCollision } = await import('./collision.js');
 const {
-    addBox, clearAllObjects, clearUnlockedObjects, rotate90, resizeObject, removeObject, duplicateObject,
+    addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT,
 } = await import('./objects.js');
 
@@ -576,6 +576,47 @@ describe('rotate90', () => {
 
         expect(() => vi.advanceTimersByTime(150)).not.toThrow();
         vi.useRealTimers();
+    });
+});
+
+describe('rotateX90', () => {
+    it('swaps height and depth in place, width unchanged', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        rotateX90(mesh, /* snapEnabled */ true);
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.6, height: 0.4, depth: 0.32 });
+    });
+
+    it('rolls back geometry and position if the rotation would collide with another object', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+        b.position.copy(a.position);
+
+        const originalPos = a.position.clone();
+        rotateX90(a, /* snapEnabled */ true);
+
+        expect(a.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
+        expect(a.position.equals(originalPos)).toBe(true);
+    });
+
+    it('returns to the original dimensions after four rotations', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        rotateX90(mesh, true);
+        rotateX90(mesh, true);
+        rotateX90(mesh, true);
+        rotateX90(mesh, true);
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
+    });
+
+    it('refuses to rotate a locked object and flashes it red instead', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        toggleLock(mesh);
+        const geoDisposeSpy = vi.spyOn(mesh.geometry, 'dispose');
+
+        expect(rotateX90(mesh, true)).toBe(false);
+
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.6, height: 0.32, depth: 0.4 });
+        expect(geoDisposeSpy).not.toHaveBeenCalled();
+        expect(mesh.material.emissive.getHex()).toBe(0xff0000);
     });
 });
 
