@@ -15,7 +15,7 @@ const { vanState, objects } = await import('./state.js');
 const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
-    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, isXrayEnabled, setXrayEnabled,
+    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, isXrayEnabled, setXrayEnabled, renameObject,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -774,5 +774,46 @@ describe('x-ray view', () => {
         const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
         expect(mesh.material.transparent).toBe(true);
         expect(mesh.material.opacity).toBeLessThan(1);
+    });
+});
+
+describe('renameObject', () => {
+    it('trims and applies a new label', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b, DEFAULT_WEIGHT, 'Kiste');
+        expect(renameObject(mesh, '  Werkzeugkiste  ')).toBe(true);
+        expect(mesh.userData.label).toBe('Werkzeugkiste');
+    });
+
+    it('rejects an empty/whitespace-only name, leaving the existing label untouched', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b, DEFAULT_WEIGHT, 'Kiste');
+        expect(renameObject(mesh, '   ')).toBe(false);
+        expect(renameObject(mesh, '')).toBe(false);
+        expect(mesh.userData.label).toBe('Kiste');
+    });
+
+    it('caps the label length at 60 characters', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
+        const longName = 'x'.repeat(100);
+        renameObject(mesh, longName);
+        expect(mesh.userData.label).toHaveLength(60);
+    });
+
+    it('works on a locked object, unlike every other mutator', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
+        toggleLock(mesh);
+        expect(renameObject(mesh, 'Neuer Name')).toBe(true);
+        expect(mesh.userData.label).toBe('Neuer Name');
+    });
+
+    it('works on a fixed fixture', () => {
+        const mesh = addBox(0.5, 0.5, 0.5, 0x64748b, 0, 'Bett', { fixed: true });
+        expect(renameObject(mesh, 'Bett (Doppel)')).toBe(true);
+        expect(mesh.userData.label).toBe('Bett (Doppel)');
+    });
+
+    it('returns false for an object that is not tracked', () => {
+        const stray = addBox(0.5, 0.5, 0.5, 0x64748b);
+        clearAllObjects();
+        expect(renameObject(stray, 'Neu')).toBe(false);
     });
 });

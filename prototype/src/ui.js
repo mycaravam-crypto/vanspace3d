@@ -2,7 +2,7 @@ import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled,
+    rotateX90, flashReject, setXrayEnabled, renameObject,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -395,6 +395,7 @@ const ICON_LOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" s
 const ICON_UNLOCK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 7.6-1.5"/></svg>';
 const ICON_TRASH = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V4.5A1.5 1.5 0 0 1 10.5 3h3A1.5 1.5 0 0 1 15 4.5V7m2 0-.8 12.1a2 2 0 0 1-2 1.9H9.8a2 2 0 0 1-2-1.9L7 7"/></svg>';
 const ICON_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const ICON_TAG = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41 13.41 20.59a2 2 0 0 1-2.82 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82Z"/><path d="M7 7h.01"/></svg>';
 // Touch/mobile-friendly equivalent of the 'R' keyboard shortcut (rotate90()) —
 // the object list is the only place a phone/tablet user (no keyboard) can
 // trigger a rotation at all.
@@ -430,10 +431,11 @@ function renderObjectList() {
         const lockTitle = fixed ? 'Fest verbaut (dauerhaft gesperrt)' : 'Sperren/Entsperren (L)';
         return `
             <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 border ${rowBorder} rounded-lg hover:border-blue-400/40 hover:bg-blue-500/10 transition-colors">
-                <button type="button" data-action="select" data-idx="${i}" class="flex-1 min-w-0 text-left py-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">
+                <button type="button" data-action="select" data-idx="${i}" title="${label}" class="flex-1 min-w-0 text-left py-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">
                     <div class="text-xs font-medium text-slate-200 truncate">${label}</div>
                     <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
                 </button>
+                <button type="button" data-action="rename" data-idx="${i}" title="Umbenennen" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_TAG}</button>
                 <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
                 <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg; (Y-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
                 <button type="button" data-action="rotate-x" data-idx="${i}" title="Kippen (T), 90&deg; (X-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE_X}</button>
@@ -454,6 +456,20 @@ function renderObjectList() {
             const action = btn.dataset.action;
             if (action === 'select') {
                 selectObject(obj);
+            } else if (action === 'rename') {
+                // Not lock-gated (see renameObject() in objects.js) — reachable
+                // for locked and fixed objects alike, unlike every other row
+                // action here.
+                const current = obj.userData.label || 'Objekt';
+                const next = prompt('Neuer Name:', current);
+                if (next === null) return; // cancelled
+                if (!next.trim()) {
+                    showStatus('Umbenennen fehlgeschlagen (Name darf nicht leer sein).');
+                    return; // nothing changed — not worth an undo slot
+                }
+                captureUndoPoint();
+                renameObject(obj, next);
+                refreshHistoryButtons();
             } else if (action === 'edit-dims') {
                 openEditDimsModal(obj);
             } else if (action === 'rotate') {
