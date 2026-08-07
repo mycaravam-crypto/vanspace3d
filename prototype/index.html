@@ -30,12 +30,20 @@
         </button>
     </div>
 
-    <!-- Floating rotate handles — track the single selected object's screen
-         position every frame (see updateRotateHandle() in controls.js) so
-         rotating on touch no longer requires leaving the 3D view for the
-         object list. Hidden by default; shown only while exactly one object
-         is selected. Two handles sit side by side: Y-axis (turn) on the
-         left, X-axis (tip) on the right. -->
+    <!-- Floating rotate/color handles — track the single selected object's
+         screen position every frame (see updateRotateHandle() in
+         controls.js) so rotating/recoloring on touch no longer requires
+         leaving the 3D view for the object list. Hidden by default; shown
+         only while exactly one object is selected. Three handles sit side by
+         side above the object: color swatch on the left, Y-axis (turn) in
+         the middle, X-axis (tip) on the right. -->
+    <button id="viewport-color-btn" type="button" title="Farbe &auml;ndern" aria-label="Objektfarbe &auml;ndern" class="hidden fixed z-20 flex -translate-x-1/2 -translate-y-1/2 w-10 h-10 items-center justify-center rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/40 text-slate-200 hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a1 1 0 0 1-1-1v-1a1 1 0 0 1 1-1 1 1 0 0 0 0-2H6a4 4 0 0 1-4-4 9 9 0 0 1 9-9h1a8 8 0 0 1 8 8 3 3 0 0 1-3 3h-1.5a1.5 1.5 0 0 0-1 2.6 1.5 1.5 0 0 1-1 2.6Z"/><circle cx="6.5" cy="11.5" r="0.5" fill="currentColor"/><circle cx="9.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="14.5" cy="7.5" r="0.5" fill="currentColor"/><circle cx="17.5" cy="11.5" r="0.5" fill="currentColor"/></svg>
+        <!-- Small dot showing the selected object's actual current color —
+             updated alongside the handle's position in updateRotateHandle(). -->
+        <span id="viewport-color-swatch" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full ring-2 ring-slate-900" aria-hidden="true"></span>
+    </button>
+    <input type="color" id="viewport-color-input" aria-hidden="true" tabindex="-1" class="sr-only">
     <button id="viewport-rotate-btn" type="button" title="Drehen (R), Y-Achse" aria-label="Objekt drehen (Y-Achse)" class="hidden fixed z-20 flex -translate-x-1/2 -translate-y-1/2 w-10 h-10 items-center justify-center rounded-full bg-slate-900/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/40 text-slate-200 hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 transition-colors">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>
     </button>
@@ -80,6 +88,15 @@
             <label for="toggle-snap" class="flex items-center space-x-2 cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
                 <input type="checkbox" id="toggle-snap" checked class="rounded text-blue-500 bg-white/10 border-white/20 focus:ring-blue-400 focus:ring-offset-0 h-4 w-4 cursor-pointer">
                 <span class="text-xs font-semibold text-slate-300">Einrasten (Fl&auml;che/Raster) &amp; Kollisionen aktiv</span>
+            </label>
+
+            <!-- Name-label Toggle — hides/shows the floating object-name tags
+                 in the 3D view (see updateObjectLabels() in controls.js). A
+                 plain checked-state read, not persisted, same as the snap
+                 toggle above. -->
+            <label for="toggle-labels" class="flex items-center space-x-2 cursor-pointer bg-white/5 p-3 rounded-xl border border-white/10 hover:bg-white/10 transition-colors">
+                <input type="checkbox" id="toggle-labels" checked class="rounded text-blue-500 bg-white/10 border-white/20 focus:ring-blue-400 focus:ring-offset-0 h-4 w-4 cursor-pointer">
+                <span class="text-xs font-semibold text-slate-300">Objektnamen in 3D-Ansicht anzeigen</span>
             </label>
 
             <!-- Standard Objects (rendered from src/library.js by ui.js) -->
@@ -306,6 +323,7 @@
                 <p class="mb-1"><span class="font-bold text-slate-200">Ma&szlig;e &auml;ndern:</span> Stift-Symbol in der Objektliste &ouml;ffnet ein Formular f&uuml;r Breite/H&ouml;he/Tiefe &ndash; nur f&uuml;r entsperrte Objekte.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Kamera:</span> Oben/Vorne/Seite-Buttons oben rechts f&uuml;r feste Ansichten.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Rotation:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd> (90°), oder auf dem Handy das Dreh-Symbol in der Objektliste antippen.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Farbe &auml;ndern:</span> Objekt ausw&auml;hlen &ndash; das Farbtropfen-Symbol &uuml;ber dem Objekt &ouml;ffnet einen Farbw&auml;hler (nur f&uuml;r entsperrte Objekte).</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Löschen:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Duplizieren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">D</kbd>.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Bewegen (Tastatur):</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↓</kbd> (hoch/runter), <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">←</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">→</kbd> (links/rechts), <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↑</kbd>/<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">↓</kbd> (vor/zurück) — je 5cm, komplett ohne Maus möglich.</p>

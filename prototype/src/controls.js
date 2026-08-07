@@ -6,11 +6,12 @@ import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision, findFaceSnap } from './collision.js';
 import {
     rotate90, rotateX90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
+    setObjectColor,
 } from './objects.js';
 import {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
 } from './selection.js';
-import { isSnapEnabled, syncSlidersFromState, refreshHistoryButtons } from './ui.js';
+import { isSnapEnabled, isLabelsEnabled, syncSlidersFromState, refreshHistoryButtons } from './ui.js';
 import { captureUndoPoint, undo, redo } from './history.js';
 
 // ==========================================
@@ -375,15 +376,53 @@ renderer.domElement.addEventListener('pointermove', handlePointerMove);
 renderer.domElement.addEventListener('pointerup', handlePointerUp);
 
 // ==========================================
-// VIEWPORT ROTATE HANDLES
+// VIEWPORT ROTATE/COLOR HANDLES
 // ==========================================
-// Two floating buttons that track the single selected object's screen
-// position, so rotating on touch (no "R"/"T" keys) no longer requires
-// leaving the 3D view for the object-list panel. Visible only for exactly
-// one selection — matches the "R"/"T" keys' per-object behavior above; for
-// a multi-selection, use the object list or a keyboard, same as today.
+// Floating buttons that track the single selected object's screen position,
+// so rotating/recoloring on touch (no "R"/"T" keys, no hovering to reveal a
+// desktop-only control) no longer requires leaving the 3D view for the
+// object-list panel. Visible only for exactly one selection — matches the
+// "R"/"T" keys' per-object behavior above; for a multi-selection, use the
+// object list instead.
+const colorHandle = document.getElementById('viewport-color-btn');
+const colorSwatch = document.getElementById('viewport-color-swatch');
+const colorInput = document.getElementById('viewport-color-input');
 const rotateHandle = document.getElementById('viewport-rotate-btn');
 const rotateXHandle = document.getElementById('viewport-rotate-x-btn');
+
+// Tracks which object the (single, shared) hidden color input is currently
+// editing, since the native color picker's 'input'/'change' events don't
+// carry that context themselves — set on open, cleared on commit.
+let colorTargetObj = null;
+
+if (colorHandle && colorInput) {
+    colorHandle.addEventListener('click', () => {
+        const obj = getSelected()[0];
+        if (!obj) return;
+        if (obj.userData.locked) { flashReject(obj); return; }
+
+        colorTargetObj = obj;
+        colorInput.value = `#${obj.material.color.getHexString()}`;
+        // Captured once per gesture, before the picker produces any 'input'
+        // events — same "pointerdown, before mutation" timing as the config
+        // sliders in ui.js.
+        captureUndoPoint();
+        refreshHistoryButtons();
+        colorInput.click();
+    });
+
+    // Fires continuously while the native picker is open (live preview) —
+    // matches the sliders' 'input' behavior.
+    colorInput.addEventListener('input', () => {
+        if (colorTargetObj) setObjectColor(colorTargetObj, colorInput.value);
+    });
+
+    // Fires once the picker is dismissed/committed.
+    colorInput.addEventListener('change', () => {
+        colorTargetObj = null;
+        refreshHistoryButtons();
+    });
+}
 
 if (rotateHandle) {
     rotateHandle.addEventListener('click', () => {
@@ -410,11 +449,12 @@ if (rotateXHandle) {
 // Called every render frame from main.js's animate loop — the object's
 // screen position changes continuously as the camera orbits.
 export function updateRotateHandle() {
-    if (!rotateHandle && !rotateXHandle) return;
+    if (!colorHandle && !rotateHandle && !rotateXHandle) return;
 
     const selected = getSelected();
     const obj = (!isDragging && !marqueeStart && selected.length === 1) ? selected[0] : null;
     if (!obj) {
+        colorHandle?.classList.add('hidden');
         rotateHandle?.classList.add('hidden');
         rotateXHandle?.classList.add('hidden');
         return;
@@ -427,14 +467,23 @@ export function updateRotateHandle() {
     const screenX = rect.left + ((ndc.x + 1) / 2) * rect.width;
     const screenY = rect.top + ((1 - ndc.y) / 2) * rect.height;
     if (ndc.z < -1 || ndc.z > 1 || !pointInRect({ x: screenX, y: screenY }, rect)) {
+        colorHandle?.classList.add('hidden');
         rotateHandle?.classList.add('hidden');
         rotateXHandle?.classList.add('hidden');
         return;
     }
 
-    // Side by side, offset above the object's screen center so neither
-    // handle sits directly on top of it and blocks the drag-start touch
-    // target: Y-axis (turn) handle on the left, X-axis (tip) on the right.
+    // Side by side, offset above the object's screen center so none of the
+    // handles sit directly on top of it and block the drag-start touch
+    // target: color swatch on the left, Y-axis (turn) in the middle, X-axis
+    // (tip) on the right, each 44px apart (same spacing as the two rotate
+    // handles had before the color handle was added).
+    if (colorHandle) {
+        colorHandle.style.left = `${screenX - 66}px`;
+        colorHandle.style.top = `${screenY - 34}px`;
+        colorHandle.classList.remove('hidden');
+        if (colorSwatch && obj.material) colorSwatch.style.background = `#${obj.material.color.getHexString()}`;
+    }
     if (rotateHandle) {
         rotateHandle.style.left = `${screenX - 22}px`;
         rotateHandle.style.top = `${screenY - 34}px`;
@@ -445,6 +494,94 @@ export function updateRotateHandle() {
         rotateXHandle.style.top = `${screenY - 34}px`;
         rotateXHandle.classList.remove('hidden');
     }
+}
+
+// ==========================================
+// OBJECT NAME LABELS
+// ==========================================
+// Small floating tags, one per placed object, that track its screen
+// position every frame — so an object's name is readable straight off the
+// 3D view instead of only in the object-list panel. Built the same way as
+// the marquee-select rectangle above (a plain DOM element positioned in
+// viewport coordinates, created on demand) rather than a THREE.Sprite, so it
+// stays crisp text at any zoom and needs no texture/canvas machinery.
+const labelLayer = document.createElement('div');
+labelLayer.id = 'object-labels-layer';
+Object.assign(labelLayer.style, {
+    position: 'fixed', inset: '0', pointerEvents: 'none', zIndex: '15',
+});
+document.body.appendChild(labelLayer);
+// Exported for tests — the layer isn't reachable via document.getElementById()
+// once a test's beforeEach resets document.body.innerHTML, since that detaches
+// (without destroying) this module-scoped node.
+export const objectLabelsLayer = labelLayer;
+
+// obj -> its label <div>. A plain Map (not WeakMap) since updateObjectLabels()
+// below needs to iterate existing entries to prune ones for removed objects.
+const labelEls = new Map();
+
+const LABEL_BASE_CLASS = 'absolute -translate-x-1/2 -translate-y-full px-1.5 py-0.5 rounded-md border backdrop-blur-sm text-[10px] font-semibold whitespace-nowrap shadow-md shadow-black/30';
+
+// Same precedence as refreshObjectAppearance()'s edge-outline color in
+// objects.js (fixed > locked > selected > default), so a label reads
+// consistently with the box's own outline color.
+function labelAccentClass(obj) {
+    if (obj.userData.fixed) return 'text-stone-300 border-stone-400/40 bg-stone-900/85';
+    if (obj.userData.locked) return 'text-red-300 border-red-400/40 bg-red-950/85';
+    if (obj.userData.selected) return 'text-blue-300 border-blue-400/50 bg-blue-950/85';
+    return 'text-slate-300 border-white/10 bg-slate-900/85';
+}
+
+// Called every render frame from main.js's animate loop, mirroring
+// updateRotateHandle() above. Syncs labelEls to the current `objects` array
+// (creating/removing DOM nodes as objects are added/removed/undone) and
+// repositions every visible label to its object's current screen position.
+export function updateObjectLabels() {
+    if (!isLabelsEnabled()) {
+        labelLayer.style.display = 'none';
+        return;
+    }
+    labelLayer.style.display = '';
+
+    const rect = renderer.domElement.getBoundingClientRect();
+
+    const live = new Set(objects);
+    for (const [obj, el] of labelEls) {
+        if (!live.has(obj)) {
+            el.remove();
+            labelEls.delete(obj);
+        }
+    }
+
+    objects.forEach((obj) => {
+        let el = labelEls.get(obj);
+        if (!el) {
+            el = document.createElement('div');
+            labelLayer.appendChild(el);
+            labelEls.set(obj, el);
+        }
+
+        // Anchored above the object's top face center, not its origin
+        // (object-center), so the tag sits just above the box rather than
+        // halfway inside it.
+        const height = obj.geometry?.parameters?.height ?? 0;
+        const top = obj.position.clone();
+        top.y += height / 2;
+        const ndc = top.project(camera);
+        const screenX = rect.left + ((ndc.x + 1) / 2) * rect.width;
+        const screenY = rect.top + ((1 - ndc.y) / 2) * rect.height;
+
+        if (ndc.z < -1 || ndc.z > 1 || !pointInRect({ x: screenX, y: screenY }, rect)) {
+            el.style.display = 'none';
+            return;
+        }
+
+        el.style.display = '';
+        el.style.left = `${screenX}px`;
+        el.style.top = `${screenY - 6}px`;
+        el.textContent = obj.userData.label || 'Objekt';
+        el.className = `${LABEL_BASE_CLASS} ${labelAccentClass(obj)}`;
+    });
 }
 
 // Distance far enough back to frame the whole van regardless of its current

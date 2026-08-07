@@ -55,13 +55,14 @@ const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
 const { STANDARD_LIBRARY } = await import('./library.js');
 const { VEHICLE_PRESETS } = await import('./vehicles.js');
-const { initUI, isSnapEnabled, refreshHistoryButtons } = await import('./ui.js');
+const { initUI, isSnapEnabled, isLabelsEnabled, refreshHistoryButtons } = await import('./ui.js');
 
 // Minimal DOM fixture mirroring the ids/attributes ui.js reads/writes.
 // Not the full Tailwind markup — just the seams this module touches.
 function mountFixture() {
     document.body.innerHTML = `
         <input type="checkbox" id="toggle-snap" checked>
+        <input type="checkbox" id="toggle-labels" checked>
 
         <div id="ui-container" class="max-h-16 overflow-hidden">
             <button id="panel-toggle" aria-expanded="false"></button>
@@ -209,6 +210,14 @@ describe('isSnapEnabled', () => {
         expect(isSnapEnabled()).toBe(true);
         document.getElementById('toggle-snap').checked = false;
         expect(isSnapEnabled()).toBe(false);
+    });
+});
+
+describe('isLabelsEnabled', () => {
+    it('reflects the checkbox state', () => {
+        expect(isLabelsEnabled()).toBe(true);
+        document.getElementById('toggle-labels').checked = false;
+        expect(isLabelsEnabled()).toBe(false);
     });
 });
 
