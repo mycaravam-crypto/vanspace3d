@@ -6,8 +6,10 @@
 # a bad deploy is a one-command rollback (see deploy/rollback.sh).
 #
 # Each run also bumps prototype/package.json's patch version and commits that
-# bump locally (not pushed) — this is the "vX.Y.Z" shown subtly in the app UI,
-# so it advances with every release. Push the commit yourself when ready.
+# bump — this is the "vX.Y.Z" shown subtly in the app UI, so it advances with
+# every release. Locally the commit is left for you to push; under CI (the
+# GitHub Actions workflow that runs this on every push to master) it's pushed
+# back automatically, tagged "[skip ci]" so it doesn't retrigger the workflow.
 #
 # Usage:
 #   VANSPACE_DEPLOY_HOST=user@your-server.example \
@@ -40,8 +42,16 @@ echo "Building..."
 npm run build
 
 echo "Committing version bump..."
+if ! git config user.email >/dev/null 2>&1; then
+    git config user.email "deploy-bot@vanspace3d.local"
+    git config user.name "VanSpace Deploy Bot"
+fi
 git add package.json package-lock.json
-git commit -m "Release v$NEW_VERSION"
+git commit -m "Release v$NEW_VERSION [skip ci]"
+if [ "${CI:-}" = "true" ]; then
+    echo "Pushing version bump (CI run)..."
+    git push
+fi
 
 echo "Creating release dir $RELEASE_PATH ..."
 ssh "$HOST" "mkdir -p '$RELEASE_PATH'"
