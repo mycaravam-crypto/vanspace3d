@@ -11,6 +11,7 @@ import {
     sanitizeFilename,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } from './persistence.js';
+import { exportSchematicPdfToFile } from './pdfExport.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
 import { selectObject, setCameraView } from './controls.js';
 
@@ -703,6 +704,11 @@ function initPersistence() {
     document.getElementById('export-packing-list').addEventListener('click', () => {
         exportPackingListToFile();
         showStatus('Packliste exportiert ✓');
+    });
+
+    document.getElementById('export-pdf').addEventListener('click', () => {
+        exportSchematicPdfToFile();
+        showStatus('PDF exportiert ✓');
     });
 
     // The hidden file input is triggered by a <label for="import-config-file">
