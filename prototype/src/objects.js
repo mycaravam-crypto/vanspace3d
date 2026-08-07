@@ -167,6 +167,22 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null,
     return mesh;
 }
 
+// Renames a placed object's label — the only mutator here that ISN'T gated
+// on obj.userData.locked/fixed: a name is metadata, not a physical
+// attribute, so there's nothing for locking (which protects position/size/
+// existence) to guard here. That also makes it the only way to fix a typo
+// in a fixed fixture's name after creation, since a fixed object can never
+// be unlocked. Returns false (no-op) if obj isn't tracked or the trimmed
+// name is empty — an accidental blank submission leaves the existing label
+// alone rather than silently clearing it.
+export function renameObject(obj, newLabel) {
+    if (!obj || !objects.includes(obj)) return false;
+    const trimmed = (newLabel || '').trim();
+    if (!trimmed) return false;
+    obj.userData.label = trimmed.slice(0, 60); // same cap as persistence.js's sanitizeLabel()
+    return true;
+}
+
 // Creates a copy of obj with the same dimensions/color/weight, offset
 // slightly so it doesn't spawn exactly overlapping the original. The copy is
 // always unlocked (regardless of the source), so it can be placed right away.

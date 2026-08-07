@@ -13,6 +13,7 @@ vi.mock('./objects.js', () => ({
     rotateX90: vi.fn(() => true),
     flashReject: vi.fn(),
     setXrayEnabled: vi.fn(),
+    renameObject: vi.fn(() => true),
     DEFAULT_WEIGHT: 5,
 }));
 vi.mock('./persistence.js', () => ({
@@ -46,7 +47,7 @@ const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled,
+    rotateX90, flashReject, setXrayEnabled, renameObject,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
@@ -177,6 +178,8 @@ beforeEach(() => {
     rotateX90.mockClear();
     flashReject.mockClear();
     setXrayEnabled.mockClear();
+    renameObject.mockClear();
+    renameObject.mockReturnValue(true);
     selectObject.mockClear();
     saveConfig.mockClear();
     saveConfig.mockReturnValue(true);
@@ -777,6 +780,64 @@ describe('object list panel', () => {
         expect(captureUndoPoint).not.toHaveBeenCalled();
         expect(toggleLock).not.toHaveBeenCalled();
         expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the rename icon prompts for a new name, captures an undo point, and applies it', () => {
+        const obj = makeFakeObj({ label: 'Eurobox M', locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Werkzeugkiste');
+
+        document.querySelector('#object-list button[data-action="rename"]').click();
+
+        expect(promptSpy).toHaveBeenCalledWith('Neuer Name:', 'Eurobox M');
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(renameObject).toHaveBeenCalledWith(obj, 'Werkzeugkiste');
+        promptSpy.mockRestore();
+    });
+
+    it('does nothing when the rename prompt is cancelled', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+
+        document.querySelector('#object-list button[data-action="rename"]').click();
+
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(renameObject).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
+    });
+
+    it('rejects a blank name without capturing an undo point', () => {
+        const obj = makeFakeObj({ locked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('   ');
+
+        document.querySelector('#object-list button[data-action="rename"]').click();
+
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(renameObject).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
+    });
+
+    it('works on a locked object, unlike every other row action', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('Neuer Name');
+
+        document.querySelector('#object-list button[data-action="rename"]').click();
+
+        expect(flashReject).not.toHaveBeenCalled();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(renameObject).toHaveBeenCalledWith(obj, 'Neuer Name');
+        promptSpy.mockRestore();
     });
 });
 
