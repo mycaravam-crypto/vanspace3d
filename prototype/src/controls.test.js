@@ -47,10 +47,16 @@ const { captureUndoPoint, undo, redo } = await import('./history.js');
 const {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
 } = await import('./selection.js');
+// controls.js reads #viewport-rotate-btn once at module-eval time and keeps
+// the element reference — must exist in the DOM before the import below.
+// A later `document.body.innerHTML = ''` in beforeEach() detaches it, but
+// the held reference (and its classList/style/click behavior) stays live.
+document.body.innerHTML = '<button id="viewport-rotate-btn" class="hidden"></button>';
 const {
     orbitControls, dragControls, selectObject, setCameraView, projectToScreen, pointInRect,
-    handlePointerDown, handlePointerMove, handlePointerUp,
+    handlePointerDown, handlePointerMove, handlePointerUp, updateRotateHandle,
 } = await import('./controls.js');
+const rotateHandle = document.getElementById('viewport-rotate-btn');
 
 function makeTrackedBox(w = 0.6, h = 0.32, d = 0.4) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial());
@@ -403,6 +409,7 @@ describe('keyboard shortcuts', () => {
     });
 
     describe('lock toggle ("l")', () => {
+
         it('toggles lock on the hovered object', () => {
             const mesh = makeTrackedBox();
             fire('hoveron', mesh);
@@ -689,6 +696,93 @@ describe('keyboard shortcuts', () => {
             undo.mockReturnValue(true);
             keydown('z', { ctrlKey: true }); // nothing hovered
             expect(undo).toHaveBeenCalled();
+        });
+    });
+});
+
+describe('viewport rotate handle', () => {
+    // Unlike the "R" key / list button (which act on activeObj/hover), the
+    // floating handle acts on the real multi-select state (userData.selected)
+    // — the same state a touch tap on the canvas sets via selectOnly(), so it
+    // works without a keyboard.
+    describe('click', () => {
+        it('rotates the single selected object, passing through the snap state', () => {
+            const mesh = makeTrackedBox();
+            selectOnly(mesh);
+
+            rotateHandle.click();
+
+            expect(captureUndoPoint).toHaveBeenCalled();
+            expect(rotate90).toHaveBeenCalledWith(mesh, true);
+            expect(refreshHistoryButtons).toHaveBeenCalled();
+        });
+
+        it('does nothing when nothing is selected', () => {
+            rotateHandle.click();
+            expect(rotate90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+        });
+
+        it('rejects rotation of a locked object without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.locked = true;
+            selectOnly(mesh);
+
+            rotateHandle.click();
+
+            expect(rotate90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
+        });
+    });
+
+    describe('updateRotateHandle', () => {
+        it('hides the handle when nothing is selected', () => {
+            updateRotateHandle();
+            expect(rotateHandle.classList.contains('hidden')).toBe(true);
+        });
+
+        it('hides the handle for a multi-selection', () => {
+            const a = makeTrackedBox();
+            const b = makeTrackedBox();
+            addManyToSelection([a, b]);
+
+            updateRotateHandle();
+
+            expect(rotateHandle.classList.contains('hidden')).toBe(true);
+        });
+
+        it('shows and positions the handle above a single selected object in view', () => {
+            const mesh = makeTrackedBox();
+            mesh.position.set(0, 0, -1); // dead ahead of the origin-positioned test camera
+            selectOnly(mesh);
+
+            updateRotateHandle();
+
+            expect(rotateHandle.classList.contains('hidden')).toBe(false);
+            expect(parseFloat(rotateHandle.style.left)).toBeCloseTo(CANVAS_RECT.width / 2, 0);
+            // Offset upward from the object's own screen point, not sitting on it.
+            expect(parseFloat(rotateHandle.style.top)).toBeLessThan(CANVAS_RECT.height / 2);
+        });
+
+        it('hides the handle when the selected object is behind the camera', () => {
+            const mesh = makeTrackedBox();
+            mesh.position.set(0, 0, 1); // behind the origin camera, which looks down -Z
+            selectOnly(mesh);
+
+            updateRotateHandle();
+
+            expect(rotateHandle.classList.contains('hidden')).toBe(true);
+        });
+
+        it('hides the handle while dragging', () => {
+            const mesh = makeTrackedBox();
+            selectOnly(mesh);
+            fire('dragstart', mesh);
+
+            updateRotateHandle();
+
+            expect(rotateHandle.classList.contains('hidden')).toBe(true);
         });
     });
 });

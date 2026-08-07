@@ -1,6 +1,6 @@
 import { scene, camera, renderer } from './scene.js';
 import { initUI } from './ui.js';
-import { orbitControls } from './controls.js';
+import { orbitControls, updateRotateHandle } from './controls.js';
 import { version } from '../package.json';
 
 // Wires all UI bindings and builds the van — either from a saved project
@@ -17,5 +17,6 @@ function animate() {
     requestAnimationFrame(animate);
     orbitControls.update(); // needed for damping
     renderer.render(scene, camera);
+    updateRotateHandle();
 }
 animate();

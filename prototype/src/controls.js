@@ -374,6 +374,57 @@ renderer.domElement.addEventListener('pointerdown', handlePointerDown);
 renderer.domElement.addEventListener('pointermove', handlePointerMove);
 renderer.domElement.addEventListener('pointerup', handlePointerUp);
 
+// ==========================================
+// VIEWPORT ROTATE HANDLE
+// ==========================================
+// A floating button that tracks the single selected object's screen
+// position, so rotating on touch (no "R" key) no longer requires leaving
+// the 3D view for the object-list panel. Visible only for exactly one
+// selection — matches the "R" key's per-object behavior above; for a
+// multi-selection, use the object list or a keyboard, same as today.
+const rotateHandle = document.getElementById('viewport-rotate-btn');
+
+if (rotateHandle) {
+    rotateHandle.addEventListener('click', () => {
+        const obj = getSelected()[0];
+        if (!obj) return;
+        if (obj.userData.locked) { flashReject(obj); return; }
+        captureUndoPoint();
+        rotate90(obj, isSnapEnabled());
+        refreshHistoryButtons();
+    });
+}
+
+// Called every render frame from main.js's animate loop — the object's
+// screen position changes continuously as the camera orbits.
+export function updateRotateHandle() {
+    if (!rotateHandle) return;
+
+    const selected = getSelected();
+    const obj = (!isDragging && !marqueeStart && selected.length === 1) ? selected[0] : null;
+    if (!obj) {
+        rotateHandle.classList.add('hidden');
+        return;
+    }
+
+    const ndc = obj.position.clone().project(camera);
+    const rect = renderer.domElement.getBoundingClientRect();
+    // Outside the near/far planes (behind the camera, or clipped) or off the
+    // canvas entirely — nothing sensible to point the handle at.
+    const screenX = rect.left + ((ndc.x + 1) / 2) * rect.width;
+    const screenY = rect.top + ((1 - ndc.y) / 2) * rect.height;
+    if (ndc.z < -1 || ndc.z > 1 || !pointInRect({ x: screenX, y: screenY }, rect)) {
+        rotateHandle.classList.add('hidden');
+        return;
+    }
+
+    // Offset above the object's screen center so the handle doesn't sit
+    // directly on top of it and block the drag-start touch target.
+    rotateHandle.style.left = `${screenX}px`;
+    rotateHandle.style.top = `${screenY - 34}px`;
+    rotateHandle.classList.remove('hidden');
+}
+
 // Distance far enough back to frame the whole van regardless of its current
 // (user-adjustable) size.
 function frameDistance() {
