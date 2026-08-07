@@ -5,7 +5,7 @@ import { camera, renderer } from './scene.js';
 import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision, findFaceSnap } from './collision.js';
 import {
-    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
+    rotate90, rotateX90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
 } from './objects.js';
 import {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
@@ -513,6 +513,23 @@ window.addEventListener('keydown', (e) => {
         if (activeObj.userData.locked) { flashReject(activeObj); return; }
         captureUndoPoint();
         rotate90(activeObj, isSnapEnabled());
+        refreshHistoryButtons();
+        return;
+    }
+
+    if (e.key === 't' || e.key === 'T') {
+        // Tip 90° around the X axis (swaps height/depth) — same per-object
+        // selection handling as 'r' above, just around the other axis.
+        if (group.length > 0) {
+            captureUndoPoint();
+            group.forEach((o) => rotateX90(o, isSnapEnabled()));
+            refreshHistoryButtons();
+            return;
+        }
+        if (!activeObj) return;
+        if (activeObj.userData.locked) { flashReject(activeObj); return; }
+        captureUndoPoint();
+        rotateX90(activeObj, isSnapEnabled());
         refreshHistoryButtons();
         return;
     }

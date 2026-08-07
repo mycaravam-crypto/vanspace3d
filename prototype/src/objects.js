@@ -282,22 +282,24 @@ export function resizeObject(obj, w, h, d, snapEnabled) {
     return true;
 }
 
-export function rotate90(obj, snapEnabled) {
+// Rebuilds obj's box geometry with the given (w, h, d), rolling back to the
+// original dimensions/position if that lands it in a collision (when
+// snapEnabled) — shared by rotate90() and rotateX90(), which only differ in
+// which pair of dimensions they swap.
+function rebuildGeometry(obj, snapEnabled, w, h, d) {
     if (obj.userData.locked) {
         flashReject(obj);
         return false;
     }
 
-    const w = obj.geometry.parameters.width;
-    const h = obj.geometry.parameters.height;
-    const d = obj.geometry.parameters.depth;
+    const oldW = obj.geometry.parameters.width;
+    const oldH = obj.geometry.parameters.height;
+    const oldD = obj.geometry.parameters.depth;
 
-    // Dispose old
     obj.geometry.dispose();
     obj.children[0].geometry.dispose();
 
-    // Swap Width (X) and Depth (Z)
-    const newGeo = new THREE.BoxGeometry(d, h, w);
+    const newGeo = new THREE.BoxGeometry(w, h, d);
     obj.geometry = newGeo;
     obj.children[0].geometry = new THREE.EdgesGeometry(newGeo);
 
@@ -308,7 +310,7 @@ export function rotate90(obj, snapEnabled) {
     if (snapEnabled && checkCollision(obj)) {
         obj.geometry.dispose();
         obj.children[0].geometry.dispose();
-        const oldGeo = new THREE.BoxGeometry(w, h, d);
+        const oldGeo = new THREE.BoxGeometry(oldW, oldH, oldD);
         obj.geometry = oldGeo;
         obj.children[0].geometry = new THREE.EdgesGeometry(oldGeo);
         obj.position.copy(originalPos);
@@ -316,4 +318,18 @@ export function rotate90(obj, snapEnabled) {
         return false;
     }
     return true;
+}
+
+// Rotates obj 90 degrees around the Y (vertical) axis — swaps its width and
+// depth, height unchanged. E.g. turning a couch to face a different wall.
+export function rotate90(obj, snapEnabled) {
+    const { width: w, height: h, depth: d } = obj.geometry.parameters;
+    return rebuildGeometry(obj, snapEnabled, d, h, w);
+}
+
+// Rotates obj 90 degrees around the X (left-right) axis — swaps its height
+// and depth, width unchanged. E.g. tipping a box onto its front/back face.
+export function rotateX90(obj, snapEnabled) {
+    const { width: w, height: h, depth: d } = obj.geometry.parameters;
+    return rebuildGeometry(obj, snapEnabled, w, d, h);
 }

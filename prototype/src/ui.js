@@ -2,7 +2,7 @@ import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    flashReject,
+    rotateX90, flashReject,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -394,6 +394,10 @@ const ICON_PENCIL = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
 // the object list is the only place a phone/tablet user (no keyboard) can
 // trigger a rotation at all.
 const ICON_ROTATE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>';
+// Same glyph as ICON_ROTATE, rotated 90deg on-screen to hint at the other
+// rotation plane — the object list's equivalent of the 'T' shortcut
+// (rotateX90()), for tipping an object onto its front/back face.
+const ICON_ROTATE_X = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(90deg)"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>';
 
 // Renders the list of placed objects (label, size, weight, lock state) so an
 // object can be found and selected/locked/deleted without hunting for it in
@@ -426,7 +430,8 @@ function renderObjectList() {
                     <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
                 </button>
                 <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
-                <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg;" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
+                <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg; (Y-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
+                <button type="button" data-action="rotate-x" data-idx="${i}" title="Kippen (T), 90&deg; (X-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE_X}</button>
                 <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&uarr;</button>
                 <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&darr;</button>
                 <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
@@ -450,6 +455,11 @@ function renderObjectList() {
                 if (obj.userData.locked) { flashReject(obj); return; }
                 captureUndoPoint();
                 rotate90(obj, isSnapEnabled());
+                refreshHistoryButtons();
+            } else if (action === 'rotate-x') {
+                if (obj.userData.locked) { flashReject(obj); return; }
+                captureUndoPoint();
+                rotateX90(obj, isSnapEnabled());
                 refreshHistoryButtons();
             } else if (action === 'up' || action === 'down') {
                 if (obj.userData.locked) { flashReject(obj); return; }

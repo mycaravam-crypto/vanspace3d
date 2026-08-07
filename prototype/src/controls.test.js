@@ -17,6 +17,7 @@ vi.mock('./ui.js', () => ({
 }));
 vi.mock('./objects.js', () => ({
     rotate90: vi.fn(),
+    rotateX90: vi.fn(),
     removeObject: vi.fn(),
     duplicateObject: vi.fn((obj) => obj), // returns something dispatchable by default
     toggleLock: vi.fn(),
@@ -40,7 +41,7 @@ vi.mock('./history.js', () => ({
 const { camera, renderer } = await import('./scene.js');
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
-    rotate90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
+    rotate90, rotateX90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
 } = await import('./objects.js');
 const { syncSlidersFromState, refreshHistoryButtons } = await import('./ui.js');
 const { captureUndoPoint, undo, redo } = await import('./history.js');
@@ -125,6 +126,7 @@ beforeEach(() => {
     Object.assign(vanState, DEFAULT_VAN_STATE);
     snapEnabled = true;
     rotate90.mockClear();
+    rotateX90.mockClear();
     removeObject.mockClear();
     duplicateObject.mockClear();
     duplicateObject.mockImplementation((obj) => obj);
@@ -370,10 +372,12 @@ describe('keyboard shortcuts', () => {
 
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', bubbles: true }));
+        input.dispatchEvent(new KeyboardEvent('keydown', { key: 't', bubbles: true }));
         input.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', ctrlKey: true, bubbles: true }));
 
         expect(removeObject).not.toHaveBeenCalled();
         expect(rotate90).not.toHaveBeenCalled();
+        expect(rotateX90).not.toHaveBeenCalled();
         expect(undo).not.toHaveBeenCalled();
     });
 
@@ -403,6 +407,37 @@ describe('keyboard shortcuts', () => {
             keydown('r');
 
             expect(rotate90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
+        });
+    });
+
+    describe('tip rotation ("t")', () => {
+        it('rotates the currently hovered object around the X axis, passing through the snap state', () => {
+            const mesh = makeTrackedBox();
+            fire('hoveron', mesh);
+
+            keydown('t');
+
+            expect(captureUndoPoint).toHaveBeenCalled();
+            expect(rotateX90).toHaveBeenCalledWith(mesh, true);
+            expect(refreshHistoryButtons).toHaveBeenCalled();
+        });
+
+        it('does nothing when no object is hovered', () => {
+            keydown('t');
+            expect(rotateX90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+        });
+
+        it('rejects rotation of a locked object without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.locked = true;
+            fire('hoveron', mesh);
+
+            keydown('t');
+
+            expect(rotateX90).not.toHaveBeenCalled();
             expect(captureUndoPoint).not.toHaveBeenCalled();
             expect(flashReject).toHaveBeenCalledWith(mesh);
         });
@@ -1143,6 +1178,19 @@ describe('keyboard shortcuts on a multi-selection', () => {
         keydown('r');
 
         expect(rotate90).toHaveBeenCalledTimes(2);
+    });
+
+    it('tips every selected object individually on "t"', () => {
+        const a = makeTrackedBox();
+        const b = makeTrackedBox();
+        addManyToSelection([a, b]);
+
+        keydown('t');
+
+        expect(captureUndoPoint).toHaveBeenCalledTimes(1);
+        expect(rotateX90).toHaveBeenCalledWith(a, true);
+        expect(rotateX90).toHaveBeenCalledWith(b, true);
+        expect(refreshHistoryButtons).toHaveBeenCalled();
     });
 
     it('deletes every selected object and clears the selection on Delete', () => {
