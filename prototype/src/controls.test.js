@@ -48,16 +48,19 @@ const { captureUndoPoint, undo, redo } = await import('./history.js');
 const {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
 } = await import('./selection.js');
-// controls.js reads #viewport-rotate-btn once at module-eval time and keeps
-// the element reference — must exist in the DOM before the import below.
-// A later `document.body.innerHTML = ''` in beforeEach() detaches it, but
-// the held reference (and its classList/style/click behavior) stays live.
-document.body.innerHTML = '<button id="viewport-rotate-btn" class="hidden"></button>';
+// controls.js reads #viewport-rotate-btn/#viewport-rotate-x-btn once at
+// module-eval time and keeps the element references — must exist in the DOM
+// before the import below. A later `document.body.innerHTML = ''` in
+// beforeEach() detaches them, but the held references (and their
+// classList/style/click behavior) stay live.
+document.body.innerHTML = '<button id="viewport-rotate-btn" class="hidden"></button>'
+    + '<button id="viewport-rotate-x-btn" class="hidden"></button>';
 const {
     orbitControls, dragControls, selectObject, setCameraView, projectToScreen, pointInRect,
     handlePointerDown, handlePointerMove, handlePointerUp, updateRotateHandle,
 } = await import('./controls.js');
 const rotateHandle = document.getElementById('viewport-rotate-btn');
+const rotateXHandle = document.getElementById('viewport-rotate-x-btn');
 
 function makeTrackedBox(w = 0.6, h = 0.32, d = 0.4) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), new THREE.MeshStandardMaterial());
@@ -735,13 +738,13 @@ describe('keyboard shortcuts', () => {
     });
 });
 
-describe('viewport rotate handle', () => {
-    // Unlike the "R" key / list button (which act on activeObj/hover), the
-    // floating handle acts on the real multi-select state (userData.selected)
-    // — the same state a touch tap on the canvas sets via selectOnly(), so it
-    // works without a keyboard.
+describe('viewport rotate handles', () => {
+    // Unlike the "R"/"T" keys / list buttons (which act on activeObj/hover),
+    // the floating handles act on the real multi-select state
+    // (userData.selected) — the same state a touch tap on the canvas sets
+    // via selectOnly(), so they work without a keyboard.
     describe('click', () => {
-        it('rotates the single selected object, passing through the snap state', () => {
+        it('rotates the single selected object around Y, passing through the snap state', () => {
             const mesh = makeTrackedBox();
             selectOnly(mesh);
 
@@ -769,15 +772,45 @@ describe('viewport rotate handle', () => {
             expect(captureUndoPoint).not.toHaveBeenCalled();
             expect(flashReject).toHaveBeenCalledWith(mesh);
         });
+
+        it('tips the single selected object around X, passing through the snap state', () => {
+            const mesh = makeTrackedBox();
+            selectOnly(mesh);
+
+            rotateXHandle.click();
+
+            expect(captureUndoPoint).toHaveBeenCalled();
+            expect(rotateX90).toHaveBeenCalledWith(mesh, true);
+            expect(refreshHistoryButtons).toHaveBeenCalled();
+        });
+
+        it('does nothing on the X handle when nothing is selected', () => {
+            rotateXHandle.click();
+            expect(rotateX90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+        });
+
+        it('rejects X-axis rotation of a locked object without capturing an undo point', () => {
+            const mesh = makeTrackedBox();
+            mesh.userData.locked = true;
+            selectOnly(mesh);
+
+            rotateXHandle.click();
+
+            expect(rotateX90).not.toHaveBeenCalled();
+            expect(captureUndoPoint).not.toHaveBeenCalled();
+            expect(flashReject).toHaveBeenCalledWith(mesh);
+        });
     });
 
     describe('updateRotateHandle', () => {
-        it('hides the handle when nothing is selected', () => {
+        it('hides both handles when nothing is selected', () => {
             updateRotateHandle();
             expect(rotateHandle.classList.contains('hidden')).toBe(true);
+            expect(rotateXHandle.classList.contains('hidden')).toBe(true);
         });
 
-        it('hides the handle for a multi-selection', () => {
+        it('hides both handles for a multi-selection', () => {
             const a = makeTrackedBox();
             const b = makeTrackedBox();
             addManyToSelection([a, b]);
@@ -785,9 +818,10 @@ describe('viewport rotate handle', () => {
             updateRotateHandle();
 
             expect(rotateHandle.classList.contains('hidden')).toBe(true);
+            expect(rotateXHandle.classList.contains('hidden')).toBe(true);
         });
 
-        it('shows and positions the handle above a single selected object in view', () => {
+        it('shows and positions both handles side by side above a single selected object in view', () => {
             const mesh = makeTrackedBox();
             mesh.position.set(0, 0, -1); // dead ahead of the origin-positioned test camera
             selectOnly(mesh);
@@ -795,12 +829,16 @@ describe('viewport rotate handle', () => {
             updateRotateHandle();
 
             expect(rotateHandle.classList.contains('hidden')).toBe(false);
-            expect(parseFloat(rotateHandle.style.left)).toBeCloseTo(CANVAS_RECT.width / 2, 0);
-            // Offset upward from the object's own screen point, not sitting on it.
+            expect(rotateXHandle.classList.contains('hidden')).toBe(false);
+            // Y-axis handle sits left of center, X-axis handle sits right of
+            // center, both offset upward from the object's own screen point.
+            expect(parseFloat(rotateHandle.style.left)).toBeCloseTo(CANVAS_RECT.width / 2 - 22, 0);
+            expect(parseFloat(rotateXHandle.style.left)).toBeCloseTo(CANVAS_RECT.width / 2 + 22, 0);
             expect(parseFloat(rotateHandle.style.top)).toBeLessThan(CANVAS_RECT.height / 2);
+            expect(parseFloat(rotateXHandle.style.top)).toBeLessThan(CANVAS_RECT.height / 2);
         });
 
-        it('hides the handle when the selected object is behind the camera', () => {
+        it('hides both handles when the selected object is behind the camera', () => {
             const mesh = makeTrackedBox();
             mesh.position.set(0, 0, 1); // behind the origin camera, which looks down -Z
             selectOnly(mesh);
@@ -808,9 +846,10 @@ describe('viewport rotate handle', () => {
             updateRotateHandle();
 
             expect(rotateHandle.classList.contains('hidden')).toBe(true);
+            expect(rotateXHandle.classList.contains('hidden')).toBe(true);
         });
 
-        it('hides the handle while dragging', () => {
+        it('hides both handles while dragging', () => {
             const mesh = makeTrackedBox();
             selectOnly(mesh);
             fire('dragstart', mesh);
@@ -818,6 +857,7 @@ describe('viewport rotate handle', () => {
             updateRotateHandle();
 
             expect(rotateHandle.classList.contains('hidden')).toBe(true);
+            expect(rotateXHandle.classList.contains('hidden')).toBe(true);
         });
     });
 });
