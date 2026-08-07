@@ -20,6 +20,7 @@ vi.mock('./persistence.js', () => ({
     hasSavedConfig: vi.fn(() => false),
     clearSavedConfig: vi.fn(),
     exportToFile: vi.fn(),
+    sanitizeFilename: vi.fn((name, fallback, extension) => `${name || fallback}.${extension}`),
     exportPackingListToFile: vi.fn(),
     importFromText: vi.fn(() => true),
     listProjects: vi.fn(() => []),
@@ -47,8 +48,8 @@ const {
     rotateX90, flashReject,
 } = await import('./objects.js');
 const {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
-    listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
+    importFromText, listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
 const { selectObject } = await import('./controls.js');
@@ -181,6 +182,7 @@ beforeEach(() => {
     hasSavedConfig.mockReturnValue(false);
     clearSavedConfig.mockClear();
     exportToFile.mockClear();
+    sanitizeFilename.mockClear();
     exportPackingListToFile.mockClear();
     importFromText.mockClear();
     importFromText.mockReturnValue(true);
@@ -975,9 +977,24 @@ describe('project persistence', () => {
         confirmSpy.mockRestore();
     });
 
-    it('exports on click', () => {
+    it('prompts for a filename, sanitizes it, and exports on click', () => {
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue('mein-projekt');
+
         document.getElementById('export-config').click();
-        expect(exportToFile).toHaveBeenCalled();
+
+        expect(promptSpy).toHaveBeenCalledWith('Dateiname für den Export:', 'vanspace3d-projekt');
+        expect(sanitizeFilename).toHaveBeenCalledWith('mein-projekt', 'vanspace3d-projekt', 'json');
+        expect(exportToFile).toHaveBeenCalledWith('mein-projekt.json');
+        promptSpy.mockRestore();
+    });
+
+    it('does not export when the filename prompt is cancelled', () => {
+        const promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+
+        document.getElementById('export-config').click();
+
+        expect(exportToFile).not.toHaveBeenCalled();
+        promptSpy.mockRestore();
     });
 
     it('exports the packing list on click and shows a success status', () => {
