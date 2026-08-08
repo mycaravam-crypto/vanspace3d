@@ -2,7 +2,7 @@ import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled, renameObject,
+    rotateX90, flashReject, setXrayEnabled, renameObject, parkObject, returnObjectToVan,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -405,6 +405,11 @@ const ICON_ROTATE = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none"
 // rotation plane — the object list's equivalent of the 'T' shortcut
 // (rotateX90()), for tipping an object onto its front/back face.
 const ICON_ROTATE_X = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transform:rotate(90deg)"><path d="M3 12a9 9 0 1 1 3 6.7"/><path d="M3 21v-6h6"/></svg>';
+// "Auslagern" (park outside the van) / "Zurück in den Laderaum" (return) —
+// a log-out / log-in pair reads naturally as "take it out of" / "put it back
+// into" the van.
+const ICON_PARK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>';
+const ICON_UNPARK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>';
 
 // Renders the list of placed objects (label, size, weight, lock state) so an
 // object can be found and selected/locked/deleted without hunting for it in
@@ -412,6 +417,14 @@ const ICON_ROTATE_X = '<svg viewBox="0 0 24 24" width="13" height="13" fill="non
 // every mutation site in the app already calls that after changing `objects`.
 function renderObjectList() {
     const container = document.getElementById('object-list');
+
+    const parkedCountEl = document.getElementById('parked-count');
+    if (parkedCountEl) {
+        const parkedCount = objects.filter((o) => o.userData.parked).length;
+        parkedCountEl.classList.toggle('hidden', parkedCount === 0);
+        parkedCountEl.textContent = `${parkedCount} ausgelagert`;
+    }
+
     if (!container) return;
 
     if (objects.length === 0) {
@@ -425,25 +438,38 @@ function renderObjectList() {
         const fixed = !!obj.userData.fixed;
         const locked = !!obj.userData.locked;
         const selected = !!obj.userData.selected;
+        const parked = !!obj.userData.parked;
         const weight = obj.userData.weight ?? 0;
         const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
-        const meta = fixed ? `${dims} &middot; fest verbaut` : `${dims} &middot; ${weight}kg`;
-        const rowBorder = selected ? 'border-blue-400/60 ring-1 ring-blue-400/40 bg-blue-500/10' : 'border-white/10 bg-white/5';
+        const parkedSuffix = parked ? ' &middot; ausgelagert' : '';
+        const meta = fixed ? `${dims} &middot; fest verbaut` : `${dims} &middot; ${weight}kg${parkedSuffix}`;
+        const rowBorder = selected
+            ? 'border-blue-400/60 ring-1 ring-blue-400/40 bg-blue-500/10'
+            : (parked ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10 bg-white/5');
         const lockTitle = fixed ? 'Fest verbaut (dauerhaft gesperrt)' : 'Sperren/Entsperren (L)';
+        const parkTitle = fixed
+            ? 'Fest verbaut (kann nicht ausgelagert werden)'
+            : (parked ? 'Zurück in den Laderaum' : 'Vorübergehend auslagern (aus dem Laderaum nehmen)');
+        // Rows now carry 9 action icons (park is the newest addition) in a
+        // fixed-width sidebar, so every icon button here is a notch tighter
+        // (p-1 instead of the p-1.5 still used elsewhere, e.g. the project
+        // list) than the app's usual icon-button padding — otherwise the
+        // label/meta text on the left is squeezed down to almost nothing.
         return `
-            <div class="flex items-center gap-0.5 pl-2 pr-1 py-1 border ${rowBorder} rounded-lg hover:border-blue-400/40 hover:bg-blue-500/10 transition-colors">
+            <div class="flex items-center gap-px pl-1.5 pr-0.5 py-1 border ${rowBorder} rounded-lg hover:border-blue-400/40 hover:bg-blue-500/10 transition-colors">
                 <button type="button" data-action="select" data-idx="${i}" title="${label}" class="flex-1 min-w-0 text-left py-0.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">
                     <div class="text-xs font-medium text-slate-200 truncate">${label}</div>
-                    <div class="text-[10px] text-slate-500 font-mono">${meta}</div>
+                    <div class="text-[10px] text-slate-500 font-mono truncate">${meta}</div>
                 </button>
-                <button type="button" data-action="rename" data-idx="${i}" title="Umbenennen" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_TAG}</button>
-                <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
-                <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg; (Y-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
-                <button type="button" data-action="rotate-x" data-idx="${i}" title="Kippen (T), 90&deg; (X-Achse)" class="p-1.5 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE_X}</button>
-                <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&uarr;</button>
-                <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1.5 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&darr;</button>
-                <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1.5 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
-                <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1.5 rounded text-slate-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">${ICON_TRASH}</button>
+                <button type="button" data-action="rename" data-idx="${i}" title="Umbenennen" class="p-1 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_TAG}</button>
+                <button type="button" data-action="edit-dims" data-idx="${i}" title="Ma&szlig;e bearbeiten" class="p-1 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_PENCIL}</button>
+                <button type="button" data-action="rotate" data-idx="${i}" title="Drehen (R), 90&deg; (Y-Achse)" class="p-1 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE}</button>
+                <button type="button" data-action="rotate-x" data-idx="${i}" title="Kippen (T), 90&deg; (X-Achse)" class="p-1 rounded text-slate-500 hover:text-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">${ICON_ROTATE_X}</button>
+                <button type="button" data-action="up" data-idx="${i}" title="Hoch (&uarr;), 5cm" class="p-1 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&uarr;</button>
+                <button type="button" data-action="down" data-idx="${i}" title="Runter (&darr;), 5cm" class="p-1 rounded text-slate-500 hover:text-slate-200 text-xs leading-none font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60">&darr;</button>
+                <button type="button" data-action="park" data-idx="${i}" title="${parkTitle}" class="p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${parked ? 'text-amber-400 hover:text-amber-300' : 'text-slate-500 hover:text-slate-300'}">${parked ? ICON_UNPARK : ICON_PARK}</button>
+                <button type="button" data-action="lock" data-idx="${i}" title="${lockTitle}" class="p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60 ${locked ? 'text-red-400 hover:text-red-300' : 'text-slate-500 hover:text-slate-300'}">${locked ? ICON_LOCK : ICON_UNLOCK}</button>
+                <button type="button" data-action="delete" data-idx="${i}" title="L&ouml;schen (Entf)" class="p-1 rounded text-slate-500 hover:text-red-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60">${ICON_TRASH}</button>
             </div>`;
     }).join('');
 
@@ -487,6 +513,12 @@ function renderObjectList() {
                 if (obj.userData.locked) { flashReject(obj); return; }
                 captureUndoPoint();
                 moveVertical(obj, action === 'up' ? 0.05 : -0.05, isSnapEnabled());
+                refreshHistoryButtons();
+            } else if (action === 'park') {
+                if (obj.userData.fixed) { flashReject(obj); return; } // never a candidate for staging outside the van
+                if (obj.userData.locked) { flashReject(obj); return; }
+                captureUndoPoint();
+                if (obj.userData.parked) returnObjectToVan(obj); else parkObject(obj);
                 refreshHistoryButtons();
             } else if (action === 'lock') {
                 if (obj.userData.fixed) { flashReject(obj); return; } // permanently locked, nothing to toggle

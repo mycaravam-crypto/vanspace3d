@@ -9,6 +9,10 @@ const tempBox1 = new THREE.Box3();
 const tempBox2 = new THREE.Box3();
 
 export function clampToVan(obj, pos) {
+    // A "parked" object (see parkObject()/returnObjectToVan() in objects.js)
+    // is deliberately staged outside the van — nothing to clamp it into.
+    if (obj.userData.parked) return;
+
     const w = obj.geometry.parameters.width;
     const h = obj.geometry.parameters.height;
     const d = obj.geometry.parameters.depth;
@@ -43,6 +47,11 @@ export function clampToVan(obj, pos) {
 // during a rigid group drag (controls.js's dragGroup()) so members of the
 // same moving group don't "collide" with each other.
 export function checkCollision(obj, exclude = null) {
+    // A parked object occupies no space in the van's packed layout — it
+    // neither collides with anything itself nor blocks other objects (the
+    // `other.userData.parked` check below).
+    if (obj.userData.parked) return false;
+
     obj.updateMatrixWorld();
     tempBox1.setFromObject(obj);
     tempBox1.expandByScalar(-0.005); // Tiny tolerance for sliding
@@ -51,6 +60,7 @@ export function checkCollision(obj, exclude = null) {
         const other = objects[i];
         if (other === obj) continue;
         if (exclude && exclude.has(other)) continue;
+        if (other.userData.parked) continue;
 
         tempBox2.setFromObject(other);
         tempBox2.expandByScalar(-0.005);

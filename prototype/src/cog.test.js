@@ -8,10 +8,11 @@ vi.mock('./scene.js', () => ({
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const { computeCenterOfGravity, refreshCenterOfGravity, cogMarker } = await import('./cog.js');
 
-function boxAt(x, y, z, weight) {
+function boxAt(x, y, z, weight, extra = {}) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.3, 0.5), new THREE.MeshStandardMaterial());
     mesh.position.set(x, y, z);
     mesh.userData.weight = weight;
+    Object.assign(mesh.userData, extra);
     return mesh;
 }
 
@@ -63,6 +64,21 @@ describe('computeCenterOfGravity', () => {
         const cog = computeCenterOfGravity();
         expect(cog.x).toBeCloseTo(-1);
         expect(cog.totalWeight).toBe(5);
+    });
+
+    it('excludes parked objects from the weight/COG total, even though they carry a weight', () => {
+        objects.push(
+            boxAt(-1, 0.1, 0, 5),
+            boxAt(1000, 0.1, 1000, 50, { parked: true }),
+        );
+        const cog = computeCenterOfGravity();
+        expect(cog.x).toBeCloseTo(-1);
+        expect(cog.totalWeight).toBe(5);
+    });
+
+    it('returns null when every remaining object is parked', () => {
+        objects.push(boxAt(1, 0.1, 1, 20, { parked: true }));
+        expect(computeCenterOfGravity()).toBeNull();
     });
 });
 

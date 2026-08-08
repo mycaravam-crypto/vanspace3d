@@ -14,6 +14,8 @@ vi.mock('./objects.js', () => ({
     flashReject: vi.fn(),
     setXrayEnabled: vi.fn(),
     renameObject: vi.fn(() => true),
+    parkObject: vi.fn(),
+    returnObjectToVan: vi.fn(),
     DEFAULT_WEIGHT: 5,
 }));
 vi.mock('./persistence.js', () => ({
@@ -50,7 +52,7 @@ const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled, renameObject,
+    rotateX90, flashReject, setXrayEnabled, renameObject, parkObject, returnObjectToVan,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
@@ -118,6 +120,7 @@ function mountFixture() {
         </div>
 
         <span id="obj-count"></span>
+        <span id="parked-count" class="hidden"></span>
         <span id="total-weight"></span>
         <span id="cog-info"></span>
         <button id="clear-all"></button>
@@ -185,6 +188,8 @@ beforeEach(() => {
     setXrayEnabled.mockClear();
     renameObject.mockClear();
     renameObject.mockReturnValue(true);
+    parkObject.mockClear();
+    returnObjectToVan.mockClear();
     selectObject.mockClear();
     saveConfig.mockClear();
     saveConfig.mockReturnValue(true);
@@ -605,11 +610,12 @@ describe('object panel buttons', () => {
 // (geometry.parameters + userData), not real THREE objects.
 function makeFakeObj({
     width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, locked = false, fixed = false,
+    parked = false,
 } = {}) {
     return {
         geometry: { parameters: { width, height, depth } },
         userData: {
-            label, weight, locked, fixed,
+            label, weight, locked, fixed, parked,
         },
     };
 }
@@ -740,6 +746,76 @@ describe('object list panel', () => {
         document.querySelector('#object-list button[data-action="lock"]').click();
         expect(captureUndoPoint).toHaveBeenCalled();
         expect(toggleLock).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the park icon on an unparked object stages it outside the van and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false, parked: false });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="park"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(parkObject).toHaveBeenCalledWith(obj);
+        expect(returnObjectToVan).not.toHaveBeenCalled();
+    });
+
+    it('clicking the park icon on a parked object returns it to the van and captures an undo point', () => {
+        const obj = makeFakeObj({ locked: false, parked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="park"]').click();
+        expect(captureUndoPoint).toHaveBeenCalled();
+        expect(returnObjectToVan).toHaveBeenCalledWith(obj);
+        expect(parkObject).not.toHaveBeenCalled();
+    });
+
+    it('clicking the park icon on a locked object flashes it instead of (un)parking it', () => {
+        const obj = makeFakeObj({ locked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="park"]').click();
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(parkObject).not.toHaveBeenCalled();
+        expect(returnObjectToVan).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('clicking the park icon on a fixed obstacle flashes it instead of parking it', () => {
+        const obj = makeFakeObj({ locked: true, fixed: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+        captureUndoPoint.mockClear();
+
+        document.querySelector('#object-list button[data-action="park"]').click();
+        expect(parkObject).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(obj);
+    });
+
+    it('shows an "ausgelagert" tag and amber styling for a parked object', () => {
+        const obj = makeFakeObj({ label: 'Kajak', parked: true });
+        objects.push(obj);
+        refreshHistoryButtons();
+
+        const list = document.getElementById('object-list');
+        expect(list.textContent).toContain('ausgelagert');
+        expect(list.querySelector('[data-action="park"][data-idx="0"]').closest('div').className).toMatch(/amber/);
+    });
+
+    it('shows and updates the parked-count badge, hiding it when nothing is parked', () => {
+        const badge = document.getElementById('parked-count');
+        objects.push(makeFakeObj({ parked: false }));
+        refreshHistoryButtons();
+        expect(badge.classList.contains('hidden')).toBe(true);
+
+        objects.push(makeFakeObj({ parked: true }));
+        refreshHistoryButtons();
+        expect(badge.classList.contains('hidden')).toBe(false);
+        expect(badge.textContent).toContain('1');
     });
 
     it('clicking delete on an unlocked object removes it and captures an undo point', () => {

@@ -13,6 +13,7 @@ const DEFAULT_EDGE_COLOR = 0x000000;
 const LOCKED_EDGE_COLOR = 0xef4444; // same red family as the "action rejected" flash
 const SELECTED_EDGE_COLOR = 0x3b82f6; // blue — multi-selection (see selection.js)
 const FIXED_EDGE_COLOR = 0x78716c; // warm stone gray — permanent, not a "you can't touch this right now" red
+const PARKED_EDGE_COLOR = 0xf59e0b; // amber — staged outside the van (see parkObject() below)
 
 // ==========================================
 // X-RAY VIEW — a global toggle (not per-object, not persisted/undo-tracked,
@@ -97,13 +98,16 @@ export function flashReject(obj) {
     }, 150);
 }
 
-// Edge-outline color, precedence fixed > locked > selected > default. Both
-// toggleLock() below and selection.js's mutators call this after flipping
-// their respective userData flag, so the states always compose correctly
+// Edge-outline color, precedence fixed > locked > selected > parked >
+// default. toggleLock() below, selection.js's mutators, and
+// parkObject()/returnObjectToVan() below all call this after flipping their
+// respective userData flag, so the states always compose correctly
 // regardless of which changed most recently. `fixed` outranks `locked` (even
 // though a fixed object is always also locked, see addBox()) so a permanent
 // built-in fixture reads visually distinct from cargo you've merely locked
-// yourself and could unlock again.
+// yourself and could unlock again. `parked` sits below `selected` so
+// selecting a parked object (e.g. to bring it back) still shows the more
+// actionable blue highlight rather than being masked by the amber tag.
 export function refreshObjectAppearance(obj) {
     const edges = obj.children[0];
     if (!edges || !edges.material) return;
@@ -111,7 +115,9 @@ export function refreshObjectAppearance(obj) {
         ? FIXED_EDGE_COLOR
         : (obj.userData.locked
             ? LOCKED_EDGE_COLOR
-            : (obj.userData.selected ? SELECTED_EDGE_COLOR : DEFAULT_EDGE_COLOR));
+            : (obj.userData.selected
+                ? SELECTED_EDGE_COLOR
+                : (obj.userData.parked ? PARKED_EDGE_COLOR : DEFAULT_EDGE_COLOR)));
     edges.material.color.setHex(color);
 }
 
@@ -165,6 +171,78 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null,
     objects.push(mesh);
     updateStats();
     return mesh;
+}
+
+// ==========================================
+// PARKING — temporarily move an object out of the van to set it aside,
+// without deleting it. A parked object is skipped entirely by
+// clampToVan()/checkCollision() (collision.js), so it neither gets pushed
+// back into the van bounds nor blocks — or is blocked by — anything else,
+// and it's excluded from the weight/COG totals (cog.js), matching the idea
+// that it's temporarily NOT loaded.
+// ==========================================
+const PARK_SLOT_PITCH = 0.6; // meters between staging slots beside the van
+const PARK_ROW_SIZE = 6; // slots per row before wrapping to the next column
+
+// A small grid just outside the van's right side (+X), front-to-back, so
+// several parked items don't render on top of each other. Purely cosmetic —
+// parked objects never collide with anything — so the pitch is a fixed slot
+// size rather than derived from each object's own footprint.
+function nextParkSlot(h) {
+    const parkedCount = objects.filter((o) => o.userData.parked).length;
+    return new THREE.Vector3(
+        vanState.maxWidth / 2 + PARK_SLOT_PITCH * (1 + Math.floor(parkedCount / PARK_ROW_SIZE)),
+        h / 2,
+        -vanState.length / 2 + PARK_SLOT_PITCH * (parkedCount % PARK_ROW_SIZE),
+    );
+}
+
+export function isParked(obj) {
+    return !!(obj && obj.userData.parked);
+}
+
+// Moves obj into a staging slot beside the van and marks it parked. Refuses
+// a fixed fixture (it's part of the van's own structure, not cargo you'd
+// ever set aside) or a locked object (locking protects position, same as
+// every other move) — flashes red instead, same guards as moveAxis() below.
+// Returns false (no-op) if obj isn't tracked or is already parked.
+export function parkObject(obj) {
+    if (!obj || !objects.includes(obj)) return false;
+    if (obj.userData.fixed || obj.userData.locked) {
+        flashReject(obj);
+        return false;
+    }
+    if (obj.userData.parked) return false;
+
+    const { height: h } = obj.geometry.parameters;
+    obj.userData.parked = true;
+    obj.position.copy(nextParkSlot(h));
+    refreshObjectAppearance(obj);
+    updateStats(); // parking changes the weight/COG totals even though the object count doesn't
+    return true;
+}
+
+// Brings a parked object back into the van: clears the parked flag and
+// places it the same way a freshly added object would — a preferred
+// front-top spawn point, falling back to a full open-spot scan on collision
+// (see placeInFirstOpenSpot() above). Refuses a locked object, same as
+// parkObject(). Returns false (no-op) if obj isn't tracked or isn't parked.
+export function returnObjectToVan(obj) {
+    if (!obj || !objects.includes(obj)) return false;
+    if (!obj.userData.parked) return false;
+    if (obj.userData.locked) {
+        flashReject(obj);
+        return false;
+    }
+
+    const { width: w, height: h, depth: d } = obj.geometry.parameters;
+    obj.userData.parked = false;
+    obj.position.set(0, vanState.maxHeight - (h / 2) - 0.1, -vanState.length / 2 + (d / 2) + 0.2);
+    clampToVan(obj, obj.position);
+    if (checkCollision(obj)) placeInFirstOpenSpot(obj, w, h, d);
+    refreshObjectAppearance(obj);
+    updateStats();
+    return true;
 }
 
 // Renames a placed object's label — the only mutator here that ISN'T gated

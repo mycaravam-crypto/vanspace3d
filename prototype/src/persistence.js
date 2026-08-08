@@ -2,7 +2,7 @@ import { vanState, objects, DEFAULT_VAN_STATE } from './state.js';
 import { buildVanGeometry } from './van.js';
 import { computeCenterOfGravity } from './cog.js';
 import {
-    addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, toggleLock, refreshObjectAppearance, DEFAULT_WEIGHT,
 } from './objects.js';
 
 const STORAGE_KEY = 'vanspace3d.config.v1';
@@ -78,6 +78,7 @@ export function serializeState() {
             label: o.userData.label ?? null,
             locked: !!o.userData.locked,
             fixed: !!o.userData.fixed,
+            parked: !!o.userData.parked,
             position: { x: o.position.x, y: o.position.y, z: o.position.z },
         })),
     };
@@ -98,6 +99,13 @@ export function applyState(payload) {
         // toggling it here would just be undone by toggleLock()'s own guard,
         // but there's no reason to trigger the reject-flash on a silent load).
         if (o.locked && !fixed) toggleLock(mesh);
+        // Set directly (not via parkObject()) so the saved position is kept
+        // exactly rather than being re-derived from a staging-slot index —
+        // a fixed fixture can never be parked, same restriction as parkObject().
+        if (o.parked && !fixed) {
+            mesh.userData.parked = true;
+            refreshObjectAppearance(mesh);
+        }
     });
     buildVanGeometry(); // rebuilds the van for the loaded state and re-clamps every object into it
 }
@@ -277,9 +285,13 @@ export function generatePackingListText() {
         // "0.0kg [gesperrt]" that would read like ordinary locked cargo.
         const weightLabel = obj.userData.fixed ? 'fest verbaut' : `${(obj.userData.weight ?? DEFAULT_WEIGHT).toFixed(1)}kg`;
         const lockFlag = (!obj.userData.fixed && obj.userData.locked) ? ' [gesperrt]' : '';
+        // Not counted in "Gesamtgewicht" below (see computeCenterOfGravity() in
+        // cog.js) — flagged here so the discrepancy between the per-item
+        // weight and the total isn't a silent mystery when reading the list.
+        const parkedFlag = obj.userData.parked ? ' [ausgelagert]' : '';
         const pos = obj.position;
         const posLabel = `${formatOffsetCm(pos.x, 'rechts', 'links')}, ${formatOffsetCm(pos.z, 'hinten', 'vorne')}, ${Math.round(pos.y * 100)}cm hoch`;
-        lines.push(`  ${i + 1}. ${label} — ${dims} — ${weightLabel}${lockFlag}`);
+        lines.push(`  ${i + 1}. ${label} — ${dims} — ${weightLabel}${lockFlag}${parkedFlag}`);
         lines.push(`     Position: ${posLabel}`);
     });
 
