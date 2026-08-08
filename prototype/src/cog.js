@@ -28,6 +28,7 @@ export function computeCenterOfGravity() {
     let sumZ = 0;
 
     for (const obj of objects) {
+        if (obj.userData.parked) continue; // set aside, not currently loaded — excluded from weight/COG
         const w = obj.userData.weight;
         if (!Number.isFinite(w) || w <= 0) continue;
         totalWeight += w;

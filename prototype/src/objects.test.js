@@ -16,6 +16,7 @@ const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, isXrayEnabled, setXrayEnabled, renameObject,
+    isParked, parkObject, returnObjectToVan,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -774,6 +775,125 @@ describe('x-ray view', () => {
         const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
         expect(mesh.material.transparent).toBe(true);
         expect(mesh.material.opacity).toBeLessThan(1);
+    });
+});
+
+describe('parkObject / returnObjectToVan', () => {
+    it('is unparked by default', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        expect(isParked(mesh)).toBe(false);
+    });
+
+    it('marks the object parked and moves it outside the van bounds', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        expect(parkObject(mesh)).toBe(true);
+        expect(isParked(mesh)).toBe(true);
+        expect(mesh.position.x).toBeGreaterThan(vanState.maxWidth / 2);
+    });
+
+    it('tints the edge outline amber while parked', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        expect(mesh.children[0].material.color.getHex()).toBe(0xf59e0b);
+    });
+
+    it('spaces out multiple parked objects instead of stacking them on the same slot', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+        parkObject(a);
+        parkObject(b);
+        expect(a.position.equals(b.position)).toBe(false);
+    });
+
+    it('is exempt from collision checks once parked, even overlapping another parked object', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.6, 0.32, 0.4, 0x10b981);
+        parkObject(a);
+        parkObject(b);
+        b.position.copy(a.position); // force an overlap
+        expect(checkCollision(a)).toBe(false);
+        expect(checkCollision(b)).toBe(false);
+    });
+
+    it('is exempt from clampToVan once parked, so moving it further away is not pulled back', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        const farOut = mesh.position.x + 5;
+        moveHorizontal(mesh, 'x', 5, true);
+        expect(mesh.position.x).toBeCloseTo(farOut);
+    });
+
+    it('refuses to park a locked object and flashes it red instead', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        toggleLock(mesh);
+        expect(parkObject(mesh)).toBe(false);
+        expect(isParked(mesh)).toBe(false);
+        expect(mesh.material.emissive.getHex()).toBe(0xff0000);
+    });
+
+    it('refuses to park a fixed fixture and flashes it red instead', () => {
+        const fixture = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Tank', { fixed: true });
+        expect(parkObject(fixture)).toBe(false);
+        expect(isParked(fixture)).toBe(false);
+        expect(fixture.material.emissive.getHex()).toBe(0xff0000);
+    });
+
+    it('is a no-op when already parked', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        const pos = mesh.position.clone();
+        expect(parkObject(mesh)).toBe(false);
+        expect(mesh.position.equals(pos)).toBe(true);
+    });
+
+    it('returns false for an object that is not tracked', () => {
+        const stray = addBox(0.6, 0.32, 0.4, 0x64748b);
+        clearAllObjects();
+        expect(parkObject(stray)).toBe(false);
+    });
+
+    it('brings a parked object back into the van, clearing the parked flag', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+
+        expect(returnObjectToVan(mesh)).toBe(true);
+        expect(isParked(mesh)).toBe(false);
+        expect(Math.abs(mesh.position.x)).toBeLessThanOrEqual(vanState.maxWidth / 2 + 1e-9);
+    });
+
+    it('restores the default (black) edge outline once back in the van', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        returnObjectToVan(mesh);
+        expect(mesh.children[0].material.color.getHex()).toBe(0x000000);
+    });
+
+    it('finds an open spot if the default spawn point is occupied on return', () => {
+        const occupant = addBox(0.6, 0.32, 0.4, 0x10b981); // sits at the default spawn spot
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+
+        returnObjectToVan(mesh);
+
+        expect(checkCollision(mesh)).toBe(false);
+        expect(mesh.position.equals(occupant.position)).toBe(false);
+    });
+
+    it('is a no-op (returns false) for an object that is not parked', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const pos = mesh.position.clone();
+        expect(returnObjectToVan(mesh)).toBe(false);
+        expect(mesh.position.equals(pos)).toBe(true);
+    });
+
+    it('refuses to return a locked (but parked) object and flashes it red instead', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        toggleLock(mesh);
+
+        expect(returnObjectToVan(mesh)).toBe(false);
+        expect(isParked(mesh)).toBe(true);
+        expect(mesh.material.emissive.getHex()).toBe(0xff0000);
     });
 });
 

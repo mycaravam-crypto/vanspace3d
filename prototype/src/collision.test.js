@@ -88,6 +88,16 @@ describe('clampToVan', () => {
         clampToVan(box, pos);
         expect(pos.y).toBeCloseTo(3.0 / 2);
     });
+
+    it('leaves a parked object untouched, even wildly outside the van bounds', () => {
+        const box = makeBox(0.6, 0.32, 0.4);
+        box.userData.parked = true;
+        const pos = new THREE.Vector3(10, 50, -100);
+        clampToVan(box, pos);
+        expect(pos.x).toBe(10);
+        expect(pos.y).toBe(50);
+        expect(pos.z).toBe(-100);
+    });
 });
 
 describe('checkCollision', () => {
@@ -171,6 +181,26 @@ describe('checkCollision', () => {
         objects.push(a, excluded, other);
 
         expect(checkCollision(a, new Set([excluded]))).toBe(true);
+    });
+
+    it('returns false immediately for a parked object, without checking against anything', () => {
+        const a = makeBox(0.6, 0.32, 0.4);
+        a.position.set(0, 0.16, 0);
+        a.userData.parked = true;
+        const b = makeBox(0.6, 0.32, 0.4);
+        b.position.set(0, 0.16, 0); // fully overlapping, if it mattered
+        objects.push(a, b);
+        expect(checkCollision(a)).toBe(false);
+    });
+
+    it('ignores a parked object as a potential collider for others', () => {
+        const a = makeBox(0.6, 0.32, 0.4);
+        a.position.set(0, 0.16, 0);
+        const parked = makeBox(0.6, 0.32, 0.4);
+        parked.position.set(0, 0.16, 0); // fully overlapping a
+        parked.userData.parked = true;
+        objects.push(a, parked);
+        expect(checkCollision(a)).toBe(false);
     });
 });
 

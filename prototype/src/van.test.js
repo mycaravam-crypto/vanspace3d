@@ -125,6 +125,19 @@ describe('buildVanGeometry', () => {
         expect(Math.abs(mesh.position.x)).toBeLessThanOrEqual(vanState.maxWidth / 2 - 0.5 / 2 + 1e-9);
     });
 
+    it('leaves a parked object untouched, even when the van shrinks drastically', () => {
+        const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.4), new THREE.MeshStandardMaterial());
+        mesh.userData.parked = true;
+        mesh.position.set(10, 0.1, 0); // staged well outside any van bounds
+        objects.push(mesh);
+
+        vanState.maxWidth = 0.6;
+        vanState.narrowWidth = 0.5;
+        buildVanGeometry();
+
+        expect(mesh.position.x).toBe(10);
+    });
+
     it('refreshes the weight/COG readouts, since maxWidth/maxPayload changes affect their warnings too', () => {
         document.body.innerHTML = '<span id="total-weight"></span><span id="cog-info"></span>';
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.4), new THREE.MeshStandardMaterial());

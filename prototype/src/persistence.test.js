@@ -8,7 +8,9 @@ vi.mock('./scene.js', () => ({
 }));
 
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
-const { addBox, clearAllObjects, toggleLock, DEFAULT_WEIGHT } = await import('./objects.js');
+const {
+    addBox, clearAllObjects, toggleLock, parkObject, isParked, DEFAULT_WEIGHT,
+} = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
     generatePackingListText, exportPackingListToFile, importFromText,
@@ -250,6 +252,51 @@ describe('loadConfig', () => {
         expect(objects[0].userData.fixed).toBe(false);
     });
 
+    it('round-trips a parked object, keeping its exact (outside-the-van) position', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(mesh);
+        const parkedPos = mesh.position.clone();
+        saveConfig();
+        clearAllObjects();
+
+        loadConfig();
+
+        expect(isParked(objects[0])).toBe(true);
+        expect(objects[0].position.x).toBeCloseTo(parkedPos.x);
+        expect(objects[0].position.z).toBeCloseTo(parkedPos.z);
+    });
+
+    it('treats a missing parked field on an old save as not parked', () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: 1,
+            vanState: { ...DEFAULT_VAN_STATE },
+            objects: [
+                { w: 0.6, h: 0.32, d: 0.4, color: 0x64748b, position: { x: 0, y: 0.16, z: 0 } }, // no parked field
+            ],
+        }));
+
+        loadConfig();
+
+        expect(isParked(objects[0])).toBe(false);
+    });
+
+    it('ignores a parked flag on a fixed obstacle entry — fixed can never be parked', () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: 1,
+            vanState: { ...DEFAULT_VAN_STATE },
+            objects: [
+                {
+                    w: 0.6, h: 0.4, d: 0.3, color: 0x78716c, fixed: true, parked: true,
+                    position: { x: 0, y: 0.2, z: 0 },
+                },
+            ],
+        }));
+
+        loadConfig();
+
+        expect(isParked(objects[0])).toBe(false);
+    });
+
     it('falls back to DEFAULT_WEIGHT for a missing or invalid weight field (old saves without it)', () => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify({
             version: 1,
@@ -335,6 +382,22 @@ describe('generatePackingListText / exportPackingListToFile', () => {
         const text = generatePackingListText();
         expect(text).toContain('Objekte (0):');
         expect(text).not.toContain('Schwerpunkt:');
+    });
+
+    it('flags a parked object and excludes its weight from the total', () => {
+        const parked = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        parkObject(parked);
+        addBox(0.3, 0.2, 0.3, 0x10b981, 2, 'Kiste');
+
+        const text = generatePackingListText();
+
+        expect(text).toContain('[ausgelagert]');
+        expect(text).toContain('Gesamtgewicht: 2.0kg');
+    });
+
+    it('does not flag an object that is not parked', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
+        expect(generatePackingListText()).not.toContain('[ausgelagert]');
     });
 
     it('exportPackingListToFile triggers a Blob download without throwing', () => {
