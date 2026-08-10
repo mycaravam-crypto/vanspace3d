@@ -95,7 +95,7 @@
             <!-- Standard Objects (rendered from src/library.js by ui.js) -->
             <div>
                 <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500 mb-2">Standard-Bibliothek</h2>
-                <div id="standard-library-list" class="grid grid-cols-2 gap-2"></div>
+                <div id="standard-library-list" class="grid grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-0.5"></div>
             </div>
 
             <!-- Custom Object Generator — collapsed by default (progressive disclosure);
@@ -116,6 +116,10 @@
                     <label for="custom-fixed" class="flex items-center gap-2 mb-3 cursor-pointer" title="Fest verbaut: Möbel, Tank – unbeweglich, kein Zuladungsgewicht">
                         <input type="checkbox" id="custom-fixed" class="rounded text-slate-400 bg-white/10 border-white/20 focus:ring-slate-400 focus:ring-offset-0 h-3.5 w-3.5 cursor-pointer">
                         <span class="text-[10px] text-slate-400 font-semibold">Fest verbaut<span class="sr-only"> (Möbel, Tank &ndash; unbeweglich, kein Zuladungsgewicht)</span></span>
+                    </label>
+                    <label for="custom-save-library" class="flex items-center gap-2 mb-3 cursor-pointer" title="Als wiederverwendbare Vorlage in der Standard-Bibliothek speichern (im Browser dieses Geräts)">
+                        <input type="checkbox" id="custom-save-library" class="rounded text-slate-400 bg-white/10 border-white/20 focus:ring-slate-400 focus:ring-offset-0 h-3.5 w-3.5 cursor-pointer">
+                        <span class="text-[10px] text-slate-400 font-semibold">In Bibliothek speichern<span class="sr-only"> (als wiederverwendbare Vorlage, im Browser dieses Ger&auml;ts gespeichert)</span></span>
                     </label>
                     <div class="grid grid-cols-4 gap-2 mb-3">
                         <div>
@@ -360,6 +364,7 @@
                 <p class="mb-1"><span class="font-bold text-slate-200">Vorübergehend auslagern:</span> Symbol in der Objektliste legt ein Objekt neben dem Laderaum ab (amber Kontur) &ndash; z&auml;hlt nicht zur Zuladung/zum Schwerpunkt und blockiert keinen Platz. Erneutes Antippen bringt es zur&uuml;ck in den Laderaum. Nur f&uuml;r entsperrte, nicht fest verbaute Objekte.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Fest verbaut:</span> Checkbox im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo; &ndash; f&uuml;r Bett, Tank &amp; Co., die permanent im Fahrzeug verbaut sind. Belegt weiterhin Platz, z&auml;hlt aber nicht zur Zuladung und kann nicht verschoben, gedreht, entsperrt, dupliziert oder gel&ouml;scht werden (graue Kontur).</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Preis:</span> Optionales Feld im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo;. Die Summe aller Preise steht oben bei den Statistiken und wird im PDF-Packplan mit ausgegeben &ndash; unabh&auml;ngig von Sperr-, Fest-verbaut- oder Auslagerungs-Status.</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">In Bibliothek speichern:</span> Checkbox im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo; &ndash; speichert die Vorlage dauerhaft (im Browser dieses Ger&auml;ts) in der Standard-Bibliothek oben, zum schnellen Wiederverwenden per Klick. Eigene Vorlagen lassen sich dort per Papierkorb-Symbol wieder entfernen.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Mehrfachauswahl:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Klick f&uuml;gt ein Objekt hinzu/entfernt es, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Ziehen &uuml;ber leerer Fl&auml;che w&auml;hlt per Rahmen (blaue Kontur). Klick auf leere Fl&auml;che hebt die Auswahl auf, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Esc</kbd> ebenfalls.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Gruppieren:</span> Bei &gt;1 ausgew&auml;hltem Objekt bewegen (Ziehen), rotieren (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd>) und l&ouml;schen (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>) die ganze Gruppe.</p>
                 <p><span class="font-bold text-slate-200">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Y</kbd>.</p>

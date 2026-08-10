@@ -22,6 +22,12 @@ function safeStorageCall(fn, fallback) {
     }
 }
 
+// Shared by every localStorage collection below (named projects, custom
+// library) that needs a per-entry id distinct from its display name.
+function generateStorageId() {
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 // Only copies over keys that are known, valid numbers — a corrupted or
 // hand-edited save falls back to the existing (default) value per field
 // instead of poisoning the whole van with NaN/undefined.
@@ -177,10 +183,6 @@ function writeProjectsStore(list) {
     }, false);
 }
 
-function generateProjectId() {
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 // Metadata only (no payload) — cheap to call for rendering a list.
 export function listProjects() {
     return readProjectsStore()
@@ -197,7 +199,7 @@ export function saveNamedProject(name) {
     const list = readProjectsStore();
     const existingIdx = list.findIndex((p) => p.name === trimmed);
     const entry = {
-        id: existingIdx >= 0 ? list[existingIdx].id : generateProjectId(),
+        id: existingIdx >= 0 ? list[existingIdx].id : generateStorageId(),
         name: trimmed,
         savedAt: Date.now(),
         payload: serializeState(),
@@ -231,6 +233,76 @@ export function renameNamedProject(id, newName) {
 
     entry.name = trimmed;
     return writeProjectsStore(list);
+}
+
+// ==========================================
+// Custom object library — user-saved "Eigenes Objekt" presets shown
+// alongside STANDARD_LIBRARY (src/library.js) in the sidebar, so a
+// frequently-reused custom size/weight/price doesn't need re-entering by
+// hand every time. Same localStorage mechanism as named projects above, a
+// separate key holding an array of {id, label, w, h, d, color, weight,
+// price, fixed} entries (dimensions in meters, same convention as
+// STANDARD_LIBRARY and serializeState()'s object entries).
+// ==========================================
+const CUSTOM_LIBRARY_KEY = 'vanspace3d.customLibrary.v1';
+
+// Individually invalid entries are dropped rather than rejecting the whole
+// list — same "sanitize per-entry" approach as applyState() uses for a
+// corrupted/hand-edited config.
+function isSaneCustomLibraryEntry(e) {
+    if (!e || typeof e !== 'object' || typeof e.id !== 'string') return false;
+    const dimsOk = ['w', 'h', 'd'].every((k) => isFiniteNumber(e[k]) && e[k] > 0 && e[k] <= 10);
+    const colorOk = typeof e.color === 'string' && /^#[0-9a-f]{6}$/i.test(e.color);
+    return dimsOk && colorOk;
+}
+
+function readCustomLibraryStore() {
+    return safeStorageCall(() => {
+        const raw = localStorage.getItem(CUSTOM_LIBRARY_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed.filter(isSaneCustomLibraryEntry) : [];
+    }, []);
+}
+
+function writeCustomLibraryStore(list) {
+    return safeStorageCall(() => {
+        localStorage.setItem(CUSTOM_LIBRARY_KEY, JSON.stringify(list));
+        return true;
+    }, false);
+}
+
+export function listCustomLibrary() {
+    return readCustomLibraryStore();
+}
+
+// Always appends a new entry — unlike named projects there's no name-based
+// "same slot" identity to overwrite, so saving the same shape twice just
+// means two entries.
+export function saveCustomLibraryEntry({
+    label, w, h, d, color, weight, price, fixed,
+}) {
+    const list = readCustomLibraryStore();
+    const entry = {
+        id: generateStorageId(),
+        label: sanitizeLabel(label) || 'Eigenes Objekt',
+        w,
+        h,
+        d,
+        color,
+        weight: sanitizeWeight(weight),
+        price: sanitizePrice(price),
+        fixed: !!fixed,
+    };
+    return writeCustomLibraryStore([...list, entry]) ? entry : false;
+}
+
+// Returns false (no-op) if no entry with that id exists.
+export function deleteCustomLibraryEntry(id) {
+    const list = readCustomLibraryStore();
+    const next = list.filter((e) => e.id !== id);
+    if (next.length === list.length) return false;
+    return writeCustomLibraryStore(next);
 }
 
 // ==========================================

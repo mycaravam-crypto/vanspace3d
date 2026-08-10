@@ -15,6 +15,7 @@ const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
     importFromText,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
+    listCustomLibrary, saveCustomLibraryEntry, deleteCustomLibraryEntry,
 } = await import('./persistence.js');
 
 const STORAGE_KEY = 'vanspace3d.config.v1';
@@ -531,6 +532,97 @@ describe('named projects', () => {
     });
 });
 
+describe('custom object library', () => {
+    const CUSTOM_LIBRARY_KEY = 'vanspace3d.customLibrary.v1';
+
+    it('has none saved initially', () => {
+        expect(listCustomLibrary()).toEqual([]);
+    });
+
+    it('saves an entry and lists it with a generated id', () => {
+        const entry = saveCustomLibraryEntry({
+            label: 'Werkzeugkiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 12.5, fixed: false,
+        });
+        expect(entry).not.toBe(false);
+        expect(typeof entry.id).toBe('string');
+
+        const list = listCustomLibrary();
+        expect(list).toHaveLength(1);
+        expect(list[0]).toMatchObject({
+            label: 'Werkzeugkiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 12.5, fixed: false,
+        });
+    });
+
+    it('falls back to "Eigenes Objekt" for a blank label', () => {
+        saveCustomLibraryEntry({
+            label: '  ', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        expect(listCustomLibrary()[0].label).toBe('Eigenes Objekt');
+    });
+
+    it('falls back to a default weight for an invalid weight, same as sanitizeWeight elsewhere', () => {
+        saveCustomLibraryEntry({
+            label: 'X', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: -5, price: 0,
+        });
+        expect(listCustomLibrary()[0].weight).toBe(DEFAULT_WEIGHT);
+    });
+
+    it('keeps a legitimate price of 0, unlike weight', () => {
+        saveCustomLibraryEntry({
+            label: 'X', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        expect(listCustomLibrary()[0].price).toBe(DEFAULT_PRICE);
+    });
+
+    it('always appends rather than overwriting an existing entry with the same label', () => {
+        saveCustomLibraryEntry({
+            label: 'Kiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        saveCustomLibraryEntry({
+            label: 'Kiste', w: 0.5, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        expect(listCustomLibrary()).toHaveLength(2);
+    });
+
+    it('deletes an entry by id', () => {
+        const { id } = saveCustomLibraryEntry({
+            label: 'Kiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        expect(deleteCustomLibraryEntry(id)).toBe(true);
+        expect(listCustomLibrary()).toEqual([]);
+    });
+
+    it('deleteCustomLibraryEntry returns false (no-op) for an unknown id', () => {
+        saveCustomLibraryEntry({
+            label: 'Kiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        });
+        expect(deleteCustomLibraryEntry('nope')).toBe(false);
+        expect(listCustomLibrary()).toHaveLength(1);
+    });
+
+    it('drops a corrupted entry (bad dimensions) instead of failing the whole list', () => {
+        localStorage.setItem(CUSTOM_LIBRARY_KEY, JSON.stringify([
+            { id: 'a', label: 'Ok', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0 },
+            { id: 'b', label: 'Bad dims', w: -1, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0 },
+        ]));
+        expect(listCustomLibrary()).toHaveLength(1);
+        expect(listCustomLibrary()[0].id).toBe('a');
+    });
+
+    it('drops a corrupted entry (invalid color) instead of failing the whole list', () => {
+        localStorage.setItem(CUSTOM_LIBRARY_KEY, JSON.stringify([
+            { id: 'a', label: 'Bad color', w: 0.3, h: 0.2, d: 0.4, color: 'not-a-color', weight: 4, price: 0 },
+        ]));
+        expect(listCustomLibrary()).toEqual([]);
+    });
+
+    it('returns an empty list instead of throwing on corrupted JSON', () => {
+        localStorage.setItem(CUSTOM_LIBRARY_KEY, '{not valid json');
+        expect(() => listCustomLibrary()).not.toThrow();
+        expect(listCustomLibrary()).toEqual([]);
+    });
+});
+
 describe('storage unavailable (e.g. Safari private mode / quota exceeded)', () => {
     it('saveConfig returns false instead of throwing when setItem fails', () => {
         const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
@@ -574,6 +666,27 @@ describe('storage unavailable (e.g. Safari private mode / quota exceeded)', () =
         });
         expect(() => listProjects()).not.toThrow();
         expect(listProjects()).toEqual([]);
+        spy.mockRestore();
+    });
+
+    it('saveCustomLibraryEntry returns false instead of throwing when setItem fails', () => {
+        const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+            throw new Error('QuotaExceededError');
+        });
+        const args = {
+            label: 'Kiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        };
+        expect(() => saveCustomLibraryEntry(args)).not.toThrow();
+        expect(saveCustomLibraryEntry(args)).toBe(false);
+        spy.mockRestore();
+    });
+
+    it('listCustomLibrary returns an empty list instead of throwing when getItem fails', () => {
+        const spy = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+            throw new Error('SecurityError');
+        });
+        expect(() => listCustomLibrary()).not.toThrow();
+        expect(listCustomLibrary()).toEqual([]);
         spy.mockRestore();
     });
 });
