@@ -307,16 +307,31 @@ const isSaneWeight = (v) => Number.isFinite(v) && v > 0 && v <= 1000;
 // semantics; this just disables the now-inapplicable weight field and clears
 // any stale error on it so a leftover "Gewicht: bitte ..." message doesn't
 // linger once weight stops being asked for.
+function applyFixedToggleState(fixedCheckbox, weightInput) {
+    weightInput.disabled = fixedCheckbox.checked;
+    weightInput.classList.toggle('opacity-50', fixedCheckbox.checked);
+    if (fixedCheckbox.checked) setCustomFieldError(CUSTOM_WEIGHT_FIELD, '');
+}
+
 function initFixedToggle() {
     const fixedCheckbox = document.getElementById('custom-fixed');
     const weightInput = document.getElementById(CUSTOM_WEIGHT_FIELD.id);
     if (!fixedCheckbox || !weightInput) return;
 
-    fixedCheckbox.addEventListener('change', () => {
-        weightInput.disabled = fixedCheckbox.checked;
-        weightInput.classList.toggle('opacity-50', fixedCheckbox.checked);
-        if (fixedCheckbox.checked) setCustomFieldError(CUSTOM_WEIGHT_FIELD, '');
-    });
+    fixedCheckbox.addEventListener('change', () => applyFixedToggleState(fixedCheckbox, weightInput));
+}
+
+// Un-checks "Fest verbaut" after a successful add and re-enables the weight
+// field to match — otherwise the checkbox stays checked from the previous
+// submission and every object generated afterward silently becomes another
+// permanent, zero-weight fixture until the user notices and unchecks it
+// themselves.
+function resetFixedToggle() {
+    const fixedCheckbox = document.getElementById('custom-fixed');
+    const weightInput = document.getElementById(CUSTOM_WEIGHT_FIELD.id);
+    if (!fixedCheckbox || !weightInput || !fixedCheckbox.checked) return;
+    fixedCheckbox.checked = false;
+    applyFixedToggleState(fixedCheckbox, weightInput);
 }
 
 function setCustomFieldError(field, message) {
@@ -373,6 +388,7 @@ function initObjectPanel() {
         } else {
             addBox(w, h, d, c, rawWeight, label);
         }
+        resetFixedToggle();
         refreshHistoryButtons();
     });
 
