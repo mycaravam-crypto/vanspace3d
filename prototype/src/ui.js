@@ -19,11 +19,41 @@ import { selectObject, setCameraView } from './controls.js';
 // UI LOGIC
 // ==========================================
 export function isSnapEnabled() {
-    return document.getElementById('toggle-snap').checked;
+    const btn = document.getElementById('toggle-snap');
+    return !!btn && btn.getAttribute('aria-pressed') === 'true';
 }
 
 export function isLabelsEnabled() {
-    return document.getElementById('toggle-labels').checked;
+    const btn = document.getElementById('toggle-labels');
+    return !!btn && btn.getAttribute('aria-pressed') === 'true';
+}
+
+// "Einrasten"/"Objektnamen" — compact pressed-state buttons (replacing the
+// old checkbox+sentence rows) for the two view/interaction settings above.
+// Not persisted/undo-tracked, same as the camera position or x-ray toggle:
+// isSnapEnabled()/isLabelsEnabled() read the button's aria-pressed attribute
+// fresh on every call, so this click handler's only job is keeping that
+// attribute and the pressed styling in sync with each other.
+function applyViewToggleStyle(btn, active) {
+    btn.classList.toggle('bg-blue-500/10', active);
+    btn.classList.toggle('text-blue-300', active);
+    btn.classList.toggle('bg-white/5', !active);
+    btn.classList.toggle('text-slate-400', !active);
+}
+
+function initViewToggleButton(id) {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        const active = btn.getAttribute('aria-pressed') !== 'true';
+        btn.setAttribute('aria-pressed', String(active));
+        applyViewToggleStyle(btn, active);
+    });
+}
+
+function initViewToggles() {
+    initViewToggleButton('toggle-snap');
+    initViewToggleButton('toggle-labels');
 }
 
 function initTabs() {
@@ -918,6 +948,7 @@ export function initUI() {
     initVehiclePresets();
     initConfigSliders();
     initObjectPanel();
+    initViewToggles();
     initEditDimsModal();
     initHistoryButtons();
     initPersistence();
