@@ -7,7 +7,7 @@ import {
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
 import {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, exportPackingListToFile, importFromText,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
     sanitizeFilename,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } from './persistence.js';
@@ -298,8 +298,13 @@ const CUSTOM_DIMENSION_FIELDS = [
     { id: 'custom-d', errorId: 'custom-d-error', label: 'Tiefe' },
 ];
 const CUSTOM_WEIGHT_FIELD = { id: 'custom-weight', errorId: 'custom-weight-error', label: 'Gewicht' };
+const CUSTOM_PRICE_FIELD = { id: 'custom-price', errorId: 'custom-price-error', label: 'Preis' };
 const isSaneDimension = (v) => Number.isFinite(v) && v > 0 && v <= 10;
 const isSaneWeight = (v) => Number.isFinite(v) && v > 0 && v <= 1000;
+// Unlike weight, 0 is a legitimate price (nothing paid for it yet) rather
+// than a value that needs rejecting — validated for every object regardless
+// of the "Fest verbaut" toggle, since a built-in fixture still costs money.
+const isSanePrice = (v) => Number.isFinite(v) && v >= 0 && v <= 1000000;
 
 // "Fest verbaut" toggles the custom-object form between generating movable
 // cargo (the default) and a permanent built-in fixture (bed platform, water
@@ -355,6 +360,7 @@ function initObjectPanel() {
 
         const dims = CUSTOM_DIMENSION_FIELDS.map((f) => parseFloat(document.getElementById(f.id).value) / 100);
         const rawWeight = parseFloat(document.getElementById(CUSTOM_WEIGHT_FIELD.id).value);
+        const rawPrice = parseFloat(document.getElementById(CUSTOM_PRICE_FIELD.id).value);
         const c = document.getElementById('custom-c').value;
         const rawName = document.getElementById('custom-name').value.trim();
         const label = rawName || 'Eigenes Objekt';
@@ -375,6 +381,11 @@ function initObjectPanel() {
             setCustomFieldError(CUSTOM_WEIGHT_FIELD, weightOk ? '' : 'Gewicht: bitte 0.1-1000 kg.');
             if (!weightOk) firstInvalidId = firstInvalidId || CUSTOM_WEIGHT_FIELD.id;
         }
+        // Price applies regardless of fixed/movable — a built-in fixture
+        // still cost real money — so it's always validated.
+        const priceOk = isSanePrice(rawPrice);
+        setCustomFieldError(CUSTOM_PRICE_FIELD, priceOk ? '' : 'Preis: bitte 0-1.000.000 €.');
+        if (!priceOk) firstInvalidId = firstInvalidId || CUSTOM_PRICE_FIELD.id;
 
         if (firstInvalidId) {
             document.getElementById(firstInvalidId).focus();
@@ -383,8 +394,14 @@ function initObjectPanel() {
 
         const [w, h, d] = dims;
         captureUndoPoint();
-        if (isFixed) {
-            addBox(w, h, d, c, rawWeight, label, { fixed: true });
+        // Only pass an options object when it actually says something beyond
+        // addBox()'s own defaults (fixed:false, price:0), keeping the common
+        // "plain movable cargo" call the same shape it's always been.
+        const boxOptions = {};
+        if (isFixed) boxOptions.fixed = true;
+        if (rawPrice > 0) boxOptions.price = rawPrice;
+        if (Object.keys(boxOptions).length > 0) {
+            addBox(w, h, d, c, rawWeight, label, boxOptions);
         } else {
             addBox(w, h, d, c, rawWeight, label);
         }
@@ -456,9 +473,15 @@ function renderObjectList() {
         const selected = !!obj.userData.selected;
         const parked = !!obj.userData.parked;
         const weight = obj.userData.weight ?? 0;
+        const price = obj.userData.price ?? 0;
         const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}`;
         const parkedSuffix = parked ? ' &middot; ausgelagert' : '';
-        const meta = fixed ? `${dims} &middot; fest verbaut` : `${dims} &middot; ${weight}kg${parkedSuffix}`;
+        // Only shown when a price was actually given — most objects have
+        // none, and a string of "0.00€" on every row would just be noise.
+        const priceSuffix = price > 0 ? ` &middot; ${price.toFixed(2)}&euro;` : '';
+        const meta = fixed
+            ? `${dims} &middot; fest verbaut${priceSuffix}`
+            : `${dims} &middot; ${weight}kg${parkedSuffix}${priceSuffix}`;
         const rowBorder = selected
             ? 'border-blue-400/60 ring-1 ring-blue-400/40 bg-blue-500/10'
             : (parked ? 'border-amber-400/40 bg-amber-500/10' : 'border-white/10 bg-white/5');
@@ -747,11 +770,6 @@ function initPersistence() {
         if (name === null) return; // cancelled
         exportToFile(sanitizeFilename(name, 'vanspace3d-projekt', 'json'));
         showStatus('Exportiert ✓');
-    });
-
-    document.getElementById('export-packing-list').addEventListener('click', () => {
-        exportPackingListToFile();
-        showStatus('Packliste exportiert ✓');
     });
 
     document.getElementById('export-pdf').addEventListener('click', () => {

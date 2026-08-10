@@ -3,11 +3,17 @@ import { scene } from './scene.js';
 import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision } from './collision.js';
 import { refreshCenterOfGravity } from './cog.js';
+import { refreshTotalPrice } from './price.js';
 
 // Illustrative default payload weight (kg) for newly added objects when the
 // caller doesn't specify one. Single source of truth, reused by ui.js (the
 // weight input's default) and persistence.js (fallback for old/invalid saves).
 export const DEFAULT_WEIGHT = 5;
+
+// No-price-given default — unlike weight, a missing/omitted price is a
+// perfectly normal "didn't cost anything (yet)" rather than a value that
+// needs an illustrative fallback.
+export const DEFAULT_PRICE = 0;
 
 const DEFAULT_EDGE_COLOR = 0x000000;
 const LOCKED_EDGE_COLOR = 0xef4444; // same red family as the "action rejected" flash
@@ -54,6 +60,7 @@ function updateStats() {
     const countEl = document.getElementById('obj-count');
     if (countEl) countEl.textContent = objects.length;
     refreshCenterOfGravity();
+    refreshTotalPrice();
 }
 
 // Scans the van's floor-up, front-to-back, left-to-right for the first spot
@@ -129,8 +136,13 @@ export function refreshObjectAppearance(obj) {
 // zero-weight object already is), and can't be duplicated (see
 // duplicateObject() below). It still occupies space like any other object,
 // so cargo can't be placed inside it.
+// `options.price` is what the object cost — independent of `fixed`/weight,
+// since a built-in fixture's cost is still money spent even though it
+// doesn't count as payload. Defaults to DEFAULT_PRICE (0, i.e. free/unknown)
+// and is included in the total-price readout (price.js) and PDF export
+// (pdfExport.js) regardless of fixed/locked/parked state.
 export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null, options = {}) {
-    const { fixed = false } = options;
+    const { fixed = false, price = DEFAULT_PRICE } = options;
     const geo = new THREE.BoxGeometry(w, h, d);
     const mat = new THREE.MeshStandardMaterial({
         color: colorHex,
@@ -145,6 +157,7 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null,
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.userData.weight = fixed ? 0 : ((Number.isFinite(weight) && weight > 0) ? weight : DEFAULT_WEIGHT);
+    mesh.userData.price = (Number.isFinite(price) && price >= 0) ? price : DEFAULT_PRICE;
     mesh.userData.locked = fixed;
     mesh.userData.fixed = fixed;
     mesh.userData.selected = false;
@@ -261,7 +274,7 @@ export function renameObject(obj, newLabel) {
     return true;
 }
 
-// Creates a copy of obj with the same dimensions/color/weight, offset
+// Creates a copy of obj with the same dimensions/color/weight/price, offset
 // slightly so it doesn't spawn exactly overlapping the original. The copy is
 // always unlocked (regardless of the source), so it can be placed right away.
 // Refuses to duplicate a fixed fixture — "another one of this built-in water
@@ -275,9 +288,10 @@ export function duplicateObject(obj) {
     const { width, height, depth } = obj.geometry.parameters;
     const color = obj.material.color.getHex();
     const weight = obj.userData.weight ?? DEFAULT_WEIGHT;
+    const price = obj.userData.price ?? DEFAULT_PRICE;
     const label = obj.userData.label;
 
-    const copy = addBox(width, height, depth, color, weight, label);
+    const copy = addBox(width, height, depth, color, weight, label, { price });
     copy.position.set(obj.position.x + 0.1, obj.position.y, obj.position.z + 0.1);
     clampToVan(copy, copy.position);
     return copy;

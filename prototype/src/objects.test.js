@@ -15,8 +15,8 @@ const { vanState, objects } = await import('./state.js');
 const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
-    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, isXrayEnabled, setXrayEnabled, renameObject,
-    isParked, parkObject, returnObjectToVan,
+    toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, DEFAULT_PRICE, isXrayEnabled, setXrayEnabled,
+    renameObject, isParked, parkObject, returnObjectToVan,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -125,6 +125,32 @@ describe('addBox', () => {
         expect(addBox(0.6, 0.32, 0.4, 0x64748b, -5).userData.weight).toBe(DEFAULT_WEIGHT);
         expect(addBox(0.6, 0.32, 0.4, 0x64748b, NaN).userData.weight).toBe(DEFAULT_WEIGHT);
         expect(addBox(0.6, 0.32, 0.4, 0x64748b, 0).userData.weight).toBe(DEFAULT_WEIGHT);
+    });
+
+    it('defaults to DEFAULT_PRICE (0) when no price option is given', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b);
+        expect(mesh.userData.price).toBe(DEFAULT_PRICE);
+    });
+
+    it('stores the given price on userData', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Objekt', { price: 49.99 });
+        expect(mesh.userData.price).toBe(49.99);
+    });
+
+    it('accepts a price of exactly 0 as legitimate, unlike weight', () => {
+        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Objekt', { price: 0 });
+        expect(mesh.userData.price).toBe(0);
+    });
+
+    it('falls back to DEFAULT_PRICE for a negative or non-finite price', () => {
+        expect(addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Objekt', { price: -10 }).userData.price).toBe(DEFAULT_PRICE);
+        expect(addBox(0.6, 0.32, 0.4, 0x64748b, 5, 'Objekt', { price: NaN }).userData.price).toBe(DEFAULT_PRICE);
+    });
+
+    it('gives a fixed fixture a price too, independent of its zero weight', () => {
+        const mesh = addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Wassertank', { fixed: true, price: 300 });
+        expect(mesh.userData.price).toBe(300);
+        expect(mesh.userData.weight).toBe(0);
     });
 
     it('is unlocked by default', () => {
@@ -461,6 +487,12 @@ describe('duplicateObject', () => {
         const original = addBox(0.6, 0.32, 0.4, 0x64748b, 9, 'Werkzeugkiste');
         const copy = duplicateObject(original);
         expect(copy.userData.label).toBe('Werkzeugkiste');
+    });
+
+    it('carries the price over to the copy', () => {
+        const original = addBox(0.6, 0.32, 0.4, 0x64748b, 9, 'Werkzeugkiste', { price: 25.5 });
+        const copy = duplicateObject(original);
+        expect(copy.userData.price).toBe(25.5);
     });
 
     it('offsets the copy from the original instead of stacking exactly on top', () => {

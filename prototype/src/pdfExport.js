@@ -1,15 +1,15 @@
 import { jsPDF } from 'jspdf';
 import { vanState, objects } from './state.js';
 import { computeCenterOfGravity } from './cog.js';
-import { DEFAULT_WEIGHT } from './objects.js';
+import { computeTotalPrice } from './price.js';
+import { DEFAULT_WEIGHT, DEFAULT_PRICE } from './objects.js';
 import { sanitizeFilename } from './persistence.js';
 
 // ==========================================
 // PDF EXPORT — a "Packplan": page 1 is a to-scale, three-view schematic
 // (top/front/side, like a technical drawing) of the van + placed objects;
-// page 2+ is a bill-of-materials table. Complements the plain-text packing
-// list (generatePackingListText() in persistence.js) with something meant
-// to be printed and taken along, not just read on screen.
+// page 2+ is a bill-of-materials table, meant to be printed and taken
+// along, not just read on screen.
 //
 // Three views instead of one matter because a single top-down view can only
 // separate objects that differ in X or Z — two objects stacked at different
@@ -31,14 +31,20 @@ const BOM_COLUMNS = [
     { label: 'Name', x: 10, width: 68 },
     { label: 'Maße B×T×H (cm)', x: 78, width: 45 },
     { label: 'Gewicht (kg)', x: 123, width: 25 },
-    { label: 'Status', x: 148, width: 40 },
+    { label: 'Preis (€)', x: 148, width: 25 },
+    { label: 'Status', x: 173, width: 40 },
 ];
+const BOM_TABLE_WIDTH = 213; // mm — sum of the last column's x + width above
 const LOCKED_RGB = [239, 68, 68]; // matches LOCKED_EDGE_COLOR (objects.js)
 const FIXED_RGB = [120, 113, 108]; // matches FIXED_EDGE_COLOR (objects.js)
 const FIXED_FILL_RGB = [214, 211, 209];
 
 function formatOffsetCm(value, positiveLabel, negativeLabel) {
     return value >= 0 ? `${Math.round(value * 100)}cm ${positiveLabel}` : `${Math.round(-value * 100)}cm ${negativeLabel}`;
+}
+
+function formatEuro(value) {
+    return `${(Number.isFinite(value) ? value : DEFAULT_PRICE).toFixed(2)} €`;
 }
 
 // The van's stepped top-down (floor-level) footprint as a list of
@@ -373,7 +379,7 @@ function drawBomHeader(doc, y) {
     BOM_COLUMNS.forEach((col) => doc.text(col.label, PAGE_MARGIN + col.x, y));
     doc.setDrawColor(180, 180, 180);
     doc.setLineWidth(0.2);
-    doc.line(PAGE_MARGIN, y + 2, PAGE_MARGIN + 188, y + 2);
+    doc.line(PAGE_MARGIN, y + 2, PAGE_MARGIN + BOM_TABLE_WIDTH, y + 2);
     return y + ROW_HEIGHT;
 }
 
@@ -421,6 +427,9 @@ function drawBom(doc, startY) {
         const label = obj.userData.label || 'Objekt';
         const dims = `${Math.round(width * 100)}×${Math.round(depth * 100)}×${Math.round(height * 100)}`;
         const weight = fixed ? '–' : (obj.userData.weight ?? DEFAULT_WEIGHT).toFixed(1);
+        // Unlike weight, price isn't tied to fixed/locked status — a built-in
+        // fixture still cost money — so it's always shown as a plain number.
+        const price = (obj.userData.price ?? DEFAULT_PRICE).toFixed(2);
         const status = fixed ? 'Fest verbaut' : (locked ? 'Gesperrt' : '–');
 
         doc.setTextColor(30, 41, 59);
@@ -428,7 +437,8 @@ function drawBom(doc, startY) {
         doc.text(fitText(doc, label, BOM_COLUMNS[1].width - 2), PAGE_MARGIN + BOM_COLUMNS[1].x, y);
         doc.text(dims, PAGE_MARGIN + BOM_COLUMNS[2].x, y);
         doc.text(weight, PAGE_MARGIN + BOM_COLUMNS[3].x, y);
-        doc.text(status, PAGE_MARGIN + BOM_COLUMNS[4].x, y);
+        doc.text(price, PAGE_MARGIN + BOM_COLUMNS[4].x, y);
+        doc.text(status, PAGE_MARGIN + BOM_COLUMNS[5].x, y);
 
         y += ROW_HEIGHT;
     });
@@ -438,24 +448,26 @@ function drawBom(doc, startY) {
 
 function drawSummary(doc, y) {
     const pageHeight = doc.internal.pageSize.getHeight();
-    if (y + ROW_HEIGHT * 3 > pageHeight - PAGE_MARGIN) {
+    if (y + ROW_HEIGHT * 4 > pageHeight - PAGE_MARGIN) {
         doc.addPage();
         y = PAGE_MARGIN;
     }
 
     const cog = computeCenterOfGravity();
     const totalWeight = cog ? cog.totalWeight : 0;
+    const totalPrice = computeTotalPrice();
 
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(9);
     doc.setTextColor(15, 23, 42);
     doc.text(`Gesamtgewicht: ${totalWeight.toFixed(1)} kg von ${vanState.maxPayload} kg Zuladung`, PAGE_MARGIN, y);
+    doc.text(`Gesamtwert: ${formatEuro(totalPrice)}`, PAGE_MARGIN, y + 5);
 
     if (cog) {
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(100, 116, 139);
         const pos = `${formatOffsetCm(cog.x, 'rechts', 'links')}, ${formatOffsetCm(cog.z, 'hinten', 'vorne')} von Fahrzeugmitte`;
-        doc.text(`Schwerpunkt: ${pos}`, PAGE_MARGIN, y + 5);
+        doc.text(`Schwerpunkt: ${pos}`, PAGE_MARGIN, y + 10);
     }
 }
 

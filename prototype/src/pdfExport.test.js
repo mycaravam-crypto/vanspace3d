@@ -59,15 +59,15 @@ const { jsPDF } = await import('jspdf');
 const { vanFootprintRects, exportSchematicPdfToFile } = await import('./pdfExport.js');
 
 function makeMesh({
-    width = 0.6, height = 0.32, depth = 0.4, x = 0, y = 0.16, z = 0, colorHex = 0x2563eb, weight = 8, label = 'Kiste',
-    locked = false, fixed = false,
+    width = 0.6, height = 0.32, depth = 0.4, x = 0, y = 0.16, z = 0, colorHex = 0x2563eb, weight = 8, price = 0,
+    label = 'Kiste', locked = false, fixed = false,
 } = {}) {
     const geo = new THREE.BoxGeometry(width, height, depth);
     const mat = new THREE.MeshStandardMaterial({ color: colorHex });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     mesh.userData = {
-        weight, label, locked, fixed,
+        weight, price, label, locked, fixed,
     };
     return mesh;
 }
@@ -202,6 +202,39 @@ describe('exportSchematicPdfToFile', () => {
         const doc = jsPDF.instances[0];
         expect(texts(doc)).toContain('Fest verbaut');
         expect(texts(doc)).toContain('Gesperrt');
+    });
+
+    it('lists each object\'s price in the BOM, including a fixed fixture', () => {
+        objects.push(
+            makeMesh({ label: 'Solarpanel', price: 199.5 }),
+            makeMesh({ label: 'Wassertank', fixed: true, price: 89, x: 0.5 }),
+        );
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        expect(texts(doc)).toContain('199.50');
+        expect(texts(doc)).toContain('89.00');
+    });
+
+    it('shows the "Preis (€)" column header', () => {
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        expect(texts(doc)).toContain('Preis (€)');
+    });
+
+    it('shows the total price in the summary block, regardless of fixed/locked/parked status', () => {
+        objects.push(
+            makeMesh({ label: 'Solarpanel', price: 199.5 }),
+            makeMesh({ label: 'Wassertank', fixed: true, price: 89, x: 0.5 }),
+        );
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        expect(texts(doc)).toContain('Gesamtwert: 288.50 €');
+    });
+
+    it('shows a zero total price when nothing is placed', () => {
+        exportSchematicPdfToFile();
+        const doc = jsPDF.instances[0];
+        expect(texts(doc)).toContain('Gesamtwert: 0.00 €');
     });
 
     it('captions all three schematic views', () => {
