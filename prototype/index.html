@@ -154,6 +154,11 @@
                             <p id="custom-weight-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label for="custom-price" class="block text-[9px] text-slate-500 font-bold mb-0.5" title="Preis (€)">Preis (&euro;)<span class="sr-only"> pro Objekt</span></label>
+                        <input type="number" id="custom-price" value="0" min="0" step="0.01" title="Preis (€)" class="w-full text-sm font-mono text-slate-100 bg-white/5 border border-white/10 rounded-lg px-2 py-1 outline-none focus:border-blue-400 focus:ring-1 focus:ring-blue-400/50">
+                        <p id="custom-price-error" class="text-[9px] text-red-400 mt-0.5 min-h-[1.1em]"></p>
+                    </div>
                     <div class="flex items-end gap-2">
                         <div>
                             <label for="custom-c" class="block text-[10px] text-slate-400 font-bold mb-1">Farbe</label>
@@ -183,6 +188,10 @@
                     <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 shrink-0" title="Gesamtgewicht">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>
                         <span class="text-xs font-semibold text-slate-300 whitespace-nowrap"><span id="total-weight" class="transition-colors">0.0</span>/<span id="max-payload-label">400</span> kg</span>
+                    </div>
+                    <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5 shrink-0" title="Gesamtwert">
+                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+                        <span class="text-xs font-semibold text-slate-300 whitespace-nowrap"><span id="total-price" class="transition-colors">0.00</span> &euro;</span>
                     </div>
                     <div class="flex-1 min-w-0 flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-2.5 py-1.5" title="Schwerpunkt">
                         <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" class="text-slate-500 shrink-0"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
@@ -294,9 +303,6 @@
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21V9"/><path d="m7 14 5-5 5 5"/><path d="M5 3h14"/></svg>
                 </label>
                 <input type="file" id="import-config-file" accept="application/json,.json" class="hidden">
-                <button id="export-packing-list" title="Packliste (.txt)" aria-label="Packliste exportieren" class="icon-tool-btn">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>
-                </button>
                 <button id="export-pdf" title="Packplan (.pdf) &ndash; Schema + St&uuml;ckliste" aria-label="Packplan als PDF exportieren" class="icon-tool-btn">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"/><path d="M14 2v6h6"/><path d="M8 13h8"/><path d="M8 17h8"/></svg>
                 </button>
@@ -347,6 +353,7 @@
                 <p class="mb-1"><span class="font-bold text-slate-200">Sperren:</span> Objekt hovern + <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">L</kbd> — geschützt vor Verschieben/Löschen (rote Kontur).</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Vorübergehend auslagern:</span> Symbol in der Objektliste legt ein Objekt neben dem Laderaum ab (amber Kontur) &ndash; z&auml;hlt nicht zur Zuladung/zum Schwerpunkt und blockiert keinen Platz. Erneutes Antippen bringt es zur&uuml;ck in den Laderaum. Nur f&uuml;r entsperrte, nicht fest verbaute Objekte.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Fest verbaut:</span> Checkbox im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo; &ndash; f&uuml;r Bett, Tank &amp; Co., die permanent im Fahrzeug verbaut sind. Belegt weiterhin Platz, z&auml;hlt aber nicht zur Zuladung und kann nicht verschoben, gedreht, entsperrt, dupliziert oder gel&ouml;scht werden (graue Kontur).</p>
+                <p class="mb-1"><span class="font-bold text-slate-200">Preis:</span> Optionales Feld im Formular f&uuml;r &bdquo;Eigenes Objekt&ldquo;. Die Summe aller Preise steht oben bei den Statistiken und wird im PDF-Packplan mit ausgegeben &ndash; unabh&auml;ngig von Sperr-, Fest-verbaut- oder Auslagerungs-Status.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Mehrfachauswahl:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Klick f&uuml;gt ein Objekt hinzu/entfernt es, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Umschalt</kbd>+Ziehen &uuml;ber leerer Fl&auml;che w&auml;hlt per Rahmen (blaue Kontur). Klick auf leere Fl&auml;che hebt die Auswahl auf, <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Esc</kbd> ebenfalls.</p>
                 <p class="mb-1"><span class="font-bold text-slate-200">Gruppieren:</span> Bei &gt;1 ausgew&auml;hltem Objekt bewegen (Ziehen), rotieren (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">R</kbd>) und l&ouml;schen (<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Entf</kbd>) die ganze Gruppe.</p>
                 <p><span class="font-bold text-slate-200">Rückgängig/Wiederholen:</span> <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Z</kbd> / <kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Strg</kbd>+<kbd class="px-1 py-0.5 bg-white/10 border border-white/10 rounded shadow-sm text-slate-200 font-mono">Y</kbd>.</p>

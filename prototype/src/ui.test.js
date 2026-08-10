@@ -25,7 +25,6 @@ vi.mock('./persistence.js', () => ({
     clearSavedConfig: vi.fn(),
     exportToFile: vi.fn(),
     sanitizeFilename: vi.fn((name, fallback, extension) => `${name || fallback}.${extension}`),
-    exportPackingListToFile: vi.fn(),
     importFromText: vi.fn(() => true),
     listProjects: vi.fn(() => []),
     saveNamedProject: vi.fn(() => true),
@@ -55,7 +54,7 @@ const {
     rotateX90, flashReject, setXrayEnabled, renameObject, parkObject, returnObjectToVan,
 } = await import('./objects.js');
 const {
-    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename, exportPackingListToFile,
+    saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
     importFromText, listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
 const { exportSchematicPdfToFile } = await import('./pdfExport.js');
@@ -99,6 +98,8 @@ function mountFixture() {
             <p id="custom-d-error"></p>
             <input id="custom-weight" value="5">
             <p id="custom-weight-error"></p>
+            <input id="custom-price" value="0">
+            <p id="custom-price-error"></p>
             <input id="custom-c" value="#10b981">
             <button type="submit" id="add-custom"></button>
         </form>
@@ -122,6 +123,7 @@ function mountFixture() {
         <span id="obj-count"></span>
         <span id="parked-count" class="hidden"></span>
         <span id="total-weight"></span>
+        <span id="total-price"></span>
         <span id="cog-info"></span>
         <button id="clear-all"></button>
 
@@ -159,7 +161,6 @@ function mountFixture() {
         <button id="load-config"></button>
         <button id="reset-config"></button>
         <button id="export-config"></button>
-        <button id="export-packing-list"></button>
         <button id="export-pdf"></button>
         <input type="file" id="import-config-file">
         <p id="persistence-status"></p>
@@ -200,7 +201,6 @@ beforeEach(() => {
     clearSavedConfig.mockClear();
     exportToFile.mockClear();
     sanitizeFilename.mockClear();
-    exportPackingListToFile.mockClear();
     exportSchematicPdfToFile.mockClear();
     importFromText.mockClear();
     importFromText.mockReturnValue(true);
@@ -628,6 +628,62 @@ describe('object panel buttons', () => {
         });
     });
 
+    describe('price field', () => {
+        it('passes a positive price through to addBox as an option', () => {
+            document.getElementById('custom-price').value = '49.99';
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt', { price: 49.99 });
+        });
+
+        it('does not pass a price option when left at the default 0, matching the pre-existing call shape', () => {
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
+        });
+
+        it('combines fixed and price into one options object when both apply', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('custom-price').value = '250';
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt', { fixed: true, price: 250 });
+        });
+
+        it('rejects a negative price without calling addBox', () => {
+            document.getElementById('custom-price').value = '-10';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(document.getElementById('custom-price-error').textContent).not.toBe('');
+        });
+
+        it('rejects a non-numeric price without calling addBox', () => {
+            document.getElementById('custom-price').value = '';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(document.getElementById('custom-price-error').textContent).not.toBe('');
+        });
+
+        it('still validates price for a fixed fixture, independent of the weight-skip', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('custom-price').value = '-5';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(document.getElementById('custom-price-error').textContent).not.toBe('');
+        });
+
+        it('clears a previous price field error once a valid value is submitted', () => {
+            document.getElementById('custom-price').value = '-5';
+            document.getElementById('add-custom').click();
+            expect(document.getElementById('custom-price-error').textContent).not.toBe('');
+
+            document.getElementById('custom-price').value = '10';
+            document.getElementById('add-custom').click();
+            expect(document.getElementById('custom-price-error').textContent).toBe('');
+            expect(addBox).toHaveBeenCalled();
+        });
+    });
+
     it('clears unlocked objects (sparing locked ones) and captures an undo point first', () => {
         document.getElementById('clear-all').click();
         expect(captureUndoPoint).toHaveBeenCalled();
@@ -641,13 +697,13 @@ describe('object panel buttons', () => {
 // Fake mesh-like entries only need the shape renderObjectList() reads
 // (geometry.parameters + userData), not real THREE objects.
 function makeFakeObj({
-    width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, locked = false, fixed = false,
+    width = 0.6, height = 0.32, depth = 0.4, label = 'Eurobox M', weight = 8, price = 0, locked = false, fixed = false,
     parked = false,
 } = {}) {
     return {
         geometry: { parameters: { width, height, depth } },
         userData: {
-            label, weight, locked, fixed, parked,
+            label, weight, price, locked, fixed, parked,
         },
     };
 }
@@ -882,6 +938,29 @@ describe('object list panel', () => {
         const list = document.getElementById('object-list');
         expect(list.textContent).toContain('fest verbaut');
         expect(list.textContent).not.toContain('0kg');
+    });
+
+    it('shows the price alongside the weight when a price was given', () => {
+        objects.push(makeFakeObj({ label: 'Solarpanel', weight: 4, price: 129.9 }));
+        refreshHistoryButtons();
+
+        expect(document.getElementById('object-list').textContent).toContain('129.90€');
+    });
+
+    it('shows the price for a fixed fixture too', () => {
+        objects.push(makeFakeObj({
+            label: 'Wassertank', weight: 0, locked: true, fixed: true, price: 250,
+        }));
+        refreshHistoryButtons();
+
+        expect(document.getElementById('object-list').textContent).toContain('250.00€');
+    });
+
+    it('omits the price entirely when it is zero, instead of showing "0.00€" clutter', () => {
+        objects.push(makeFakeObj({ label: 'Eurobox M', price: 0 }));
+        refreshHistoryButtons();
+
+        expect(document.getElementById('object-list').textContent).not.toContain('€');
     });
 
     it('clicking the lock icon on a fixed obstacle flashes it instead of toggling', () => {
@@ -1199,12 +1278,6 @@ describe('project persistence', () => {
 
         expect(exportToFile).not.toHaveBeenCalled();
         promptSpy.mockRestore();
-    });
-
-    it('exports the packing list on click and shows a success status', () => {
-        document.getElementById('export-packing-list').click();
-        expect(exportPackingListToFile).toHaveBeenCalled();
-        expect(document.getElementById('persistence-status').textContent).toMatch(/packliste/i);
     });
 
     it('exports the PDF packplan on click and shows a success status', () => {

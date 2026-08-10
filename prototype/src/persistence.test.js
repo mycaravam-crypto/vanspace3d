@@ -9,11 +9,11 @@ vi.mock('./scene.js', () => ({
 
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
-    addBox, clearAllObjects, toggleLock, parkObject, isParked, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, toggleLock, parkObject, isParked, DEFAULT_WEIGHT, DEFAULT_PRICE,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
-    generatePackingListText, exportPackingListToFile, importFromText,
+    importFromText,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
 } = await import('./persistence.js');
 
@@ -164,6 +164,43 @@ describe('loadConfig', () => {
         expect(objects[0].userData.weight).toBe(17.5);
     });
 
+    it('round-trips the price of each object', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 17.5, 'Objekt', { price: 42.5 });
+        saveConfig();
+        clearAllObjects();
+
+        loadConfig();
+
+        expect(objects[0].userData.price).toBe(42.5);
+    });
+
+    it('round-trips a price of exactly 0, unlike weight which would fall back', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b, 17.5, 'Objekt', { price: 0 });
+        saveConfig();
+        clearAllObjects();
+
+        loadConfig();
+
+        expect(objects[0].userData.price).toBe(0);
+    });
+
+    it('falls back to DEFAULT_PRICE for a missing or invalid price field (old saves without it)', () => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({
+            version: 1,
+            vanState: { ...DEFAULT_VAN_STATE },
+            objects: [
+                { w: 0.6, h: 0.32, d: 0.4, color: 0x64748b, position: { x: 0, y: 0.16, z: 0 } }, // no price field at all
+                {
+                    w: 0.3, h: 0.2, d: 0.3, color: 0x10b981, price: -5, position: { x: 1, y: 0.1, z: 0 },
+                }, // invalid price
+            ],
+        }));
+
+        loadConfig();
+
+        expect(objects.every((o) => o.userData.price === DEFAULT_PRICE)).toBe(true);
+    });
+
     it('round-trips the label of each object', () => {
         addBox(0.6, 0.32, 0.4, 0x64748b, 17.5, 'Werkzeugkiste');
         saveConfig();
@@ -312,97 +349,6 @@ describe('loadConfig', () => {
         loadConfig();
 
         expect(objects.every((o) => o.userData.weight === DEFAULT_WEIGHT)).toBe(true);
-    });
-});
-
-describe('generatePackingListText / exportPackingListToFile', () => {
-    it('lists van dimensions and payload limit', () => {
-        vanState.length = 3.3;
-        vanState.maxHeight = 1.9;
-        vanState.maxWidth = 1.8;
-        vanState.narrowWidth = 1.3;
-        vanState.maxPayload = 400;
-
-        const text = generatePackingListText();
-
-        expect(text).toContain('330cm');
-        expect(text).toContain('190cm');
-        expect(text).toContain('180cm');
-        expect(text).toContain('130cm');
-        expect(text).toContain('400kg');
-    });
-
-    it('lists every placed object with label, size, weight and position', () => {
-        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        mesh.position.set(0.2, 0.16, -1.0);
-
-        const text = generatePackingListText();
-
-        expect(text).toContain('Objekte (1):');
-        expect(text).toContain('Eurobox M — 60x40x32cm — 8.0kg');
-        expect(text).toContain('20cm rechts');
-        expect(text).toContain('16cm hoch');
-    });
-
-    it('flags a locked object', () => {
-        const mesh = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        toggleLock(mesh);
-
-        expect(generatePackingListText()).toContain('[gesperrt]');
-    });
-
-    it('does not flag an unlocked object', () => {
-        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        expect(generatePackingListText()).not.toContain('[gesperrt]');
-    });
-
-    it('shows "fest verbaut" instead of a weight/lock flag for a fixed obstacle', () => {
-        addBox(0.6, 0.4, 0.3, 0x78716c, 0, 'Wassertank', { fixed: true });
-
-        const text = generatePackingListText();
-
-        // Exact line match confirms no trailing weight/kg or [gesperrt] flag
-        // on the per-item line itself (the overall "Gesamtgewicht: 0.0kg"
-        // total further down is still legitimate — this fixture is the only
-        // object and correctly contributes no weight to that total).
-        expect(text).toContain('  1. Wassertank — 60x30x40cm — fest verbaut\n');
-    });
-
-    it('shows total weight against the payload limit and the center of gravity', () => {
-        vanState.maxPayload = 400;
-        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M').position.set(0.3, 0.16, 0.5);
-
-        const text = generatePackingListText();
-
-        expect(text).toContain('Gesamtgewicht: 8.0kg von 400kg Zuladung');
-        expect(text).toContain('Schwerpunkt: 30cm rechts, 50cm hinten von Fahrzeugmitte');
-    });
-
-    it('omits the center-of-gravity line when nothing is placed', () => {
-        const text = generatePackingListText();
-        expect(text).toContain('Objekte (0):');
-        expect(text).not.toContain('Schwerpunkt:');
-    });
-
-    it('flags a parked object and excludes its weight from the total', () => {
-        const parked = addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        parkObject(parked);
-        addBox(0.3, 0.2, 0.3, 0x10b981, 2, 'Kiste');
-
-        const text = generatePackingListText();
-
-        expect(text).toContain('[ausgelagert]');
-        expect(text).toContain('Gesamtgewicht: 2.0kg');
-    });
-
-    it('does not flag an object that is not parked', () => {
-        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        expect(generatePackingListText()).not.toContain('[ausgelagert]');
-    });
-
-    it('exportPackingListToFile triggers a Blob download without throwing', () => {
-        addBox(0.6, 0.32, 0.4, 0x64748b, 8, 'Eurobox M');
-        expect(() => exportPackingListToFile()).not.toThrow();
     });
 });
 

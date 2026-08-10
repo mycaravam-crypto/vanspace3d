@@ -1,8 +1,7 @@
 import { vanState, objects, DEFAULT_VAN_STATE } from './state.js';
 import { buildVanGeometry } from './van.js';
-import { computeCenterOfGravity } from './cog.js';
 import {
-    addBox, clearAllObjects, toggleLock, refreshObjectAppearance, DEFAULT_WEIGHT,
+    addBox, clearAllObjects, toggleLock, refreshObjectAppearance, DEFAULT_WEIGHT, DEFAULT_PRICE,
 } from './objects.js';
 
 const STORAGE_KEY = 'vanspace3d.config.v1';
@@ -51,6 +50,12 @@ function sanitizeWeight(w) {
     return (isFiniteNumber(w) && w > 0 && w <= 2000) ? w : DEFAULT_WEIGHT;
 }
 
+// Same leniency as weight, but unlike weight 0 is a legitimate value (an
+// object that didn't cost anything), not something to fall back away from.
+function sanitizePrice(p) {
+    return (isFiniteNumber(p) && p >= 0 && p <= 1000000) ? p : DEFAULT_PRICE;
+}
+
 // Same leniency as weight: missing (old saves) or invalid falls back to
 // addBox()'s own "Objekt" default rather than disqualifying the entry.
 function sanitizeLabel(l) {
@@ -75,6 +80,7 @@ export function serializeState() {
             d: o.geometry.parameters.depth,
             color: o.material.color.getHex(),
             weight: o.userData.weight ?? DEFAULT_WEIGHT,
+            price: o.userData.price ?? DEFAULT_PRICE,
             label: o.userData.label ?? null,
             locked: !!o.userData.locked,
             fixed: !!o.userData.fixed,
@@ -92,7 +98,9 @@ export function applyState(payload) {
     Object.assign(vanState, sanitizeVanState(payload.vanState));
     (payload.objects || []).filter(isSaneObjectEntry).forEach((o) => {
         const fixed = !!o.fixed;
-        const mesh = addBox(o.w, o.h, o.d, o.color, sanitizeWeight(o.weight), sanitizeLabel(o.label), { fixed });
+        const mesh = addBox(o.w, o.h, o.d, o.color, sanitizeWeight(o.weight), sanitizeLabel(o.label), {
+            fixed, price: sanitizePrice(o.price),
+        });
         mesh.position.set(o.position.x, o.position.y, o.position.z);
         // addBox() already creates a fixed fixture locked — toggle only for a
         // plain cargo item saved as locked (fixed's lock is permanent, so
@@ -253,61 +261,6 @@ export function sanitizeFilename(name, fallback, extension) {
 
 export function exportToFile(filename = 'vanspace3d-project.json') {
     downloadTextFile(JSON.stringify(serializeState(), null, 2), filename, 'application/json');
-}
-
-// ==========================================
-// Human-readable packing list (.txt) — a take-along summary for loading the
-// van, distinct from the JSON project file above (which is meant for
-// re-import, not reading).
-// ==========================================
-function formatOffsetCm(value, positiveLabel, negativeLabel) {
-    return value >= 0 ? `${Math.round(value * 100)}cm ${positiveLabel}` : `${Math.round(-value * 100)}cm ${negativeLabel}`;
-}
-
-export function generatePackingListText() {
-    const lines = [
-        'VanSpace 3D – Packliste',
-        `Erstellt: ${new Date().toLocaleString('de-DE')}`,
-        '',
-        'Fahrzeug:',
-        `  Länge: ${Math.round(vanState.length * 100)}cm, Höhe: ${Math.round(vanState.maxHeight * 100)}cm, Breite: ${Math.round(vanState.maxWidth * 100)}cm (unten: ${Math.round(vanState.narrowWidth * 100)}cm)`,
-        `  Max. Zuladung: ${vanState.maxPayload}kg`,
-        '',
-        `Objekte (${objects.length}):`,
-    ];
-
-    objects.forEach((obj, i) => {
-        const { width, height, depth } = obj.geometry.parameters;
-        const label = obj.userData.label || 'Objekt';
-        const dims = `${Math.round(width * 100)}x${Math.round(depth * 100)}x${Math.round(height * 100)}cm`;
-        // A fixed fixture carries no weight (it's not payload) and its lock
-        // is implied/permanent, so it gets its own label instead of a
-        // "0.0kg [gesperrt]" that would read like ordinary locked cargo.
-        const weightLabel = obj.userData.fixed ? 'fest verbaut' : `${(obj.userData.weight ?? DEFAULT_WEIGHT).toFixed(1)}kg`;
-        const lockFlag = (!obj.userData.fixed && obj.userData.locked) ? ' [gesperrt]' : '';
-        // Not counted in "Gesamtgewicht" below (see computeCenterOfGravity() in
-        // cog.js) — flagged here so the discrepancy between the per-item
-        // weight and the total isn't a silent mystery when reading the list.
-        const parkedFlag = obj.userData.parked ? ' [ausgelagert]' : '';
-        const pos = obj.position;
-        const posLabel = `${formatOffsetCm(pos.x, 'rechts', 'links')}, ${formatOffsetCm(pos.z, 'hinten', 'vorne')}, ${Math.round(pos.y * 100)}cm hoch`;
-        lines.push(`  ${i + 1}. ${label} — ${dims} — ${weightLabel}${lockFlag}${parkedFlag}`);
-        lines.push(`     Position: ${posLabel}`);
-    });
-
-    const cog = computeCenterOfGravity();
-    const totalWeight = cog ? cog.totalWeight : 0;
-    lines.push('');
-    lines.push(`Gesamtgewicht: ${totalWeight.toFixed(1)}kg von ${vanState.maxPayload}kg Zuladung`);
-    if (cog) {
-        lines.push(`Schwerpunkt: ${formatOffsetCm(cog.x, 'rechts', 'links')}, ${formatOffsetCm(cog.z, 'hinten', 'vorne')} von Fahrzeugmitte`);
-    }
-
-    return lines.join('\n');
-}
-
-export function exportPackingListToFile(filename = 'vanspace3d-packliste.txt') {
-    downloadTextFile(generatePackingListText(), filename, 'text/plain');
 }
 
 // Returns true if the given text was a valid project JSON and was applied.
