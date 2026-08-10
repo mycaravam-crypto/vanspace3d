@@ -267,13 +267,16 @@ function renderStandardLibrary() {
 
     container.innerHTML = STANDARD_LIBRARY.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
+        // Only shown when the entry actually has one — most non-Eurobox
+        // entries don't, and a "0.00€" on every card would just be noise.
+        const priceSuffix = item.price > 0 ? `, ${item.price.toFixed(2)}€` : '';
         return `
-        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${item.label}: ${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}cm, ${item.weight}kg">
+        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${item.label}: ${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}cm, ${item.weight}kg${priceSuffix}">
             <span class="flex items-center gap-1.5 min-w-0">
                 <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
                 <span class="text-sm font-medium text-slate-300 truncate">${item.label}</span>
             </span>
-            <span class="text-[10px] text-slate-500 font-mono truncate">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)} &middot; ${item.weight}kg</span>
+            <span class="text-[10px] text-slate-500 font-mono truncate">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)} &middot; ${item.weight}kg${priceSuffix}</span>
         </button>
     `;
     }).join('');
@@ -282,7 +285,7 @@ function renderStandardLibrary() {
         const item = STANDARD_LIBRARY.find((i) => i.id === btn.dataset.libId);
         btn.addEventListener('click', () => {
             captureUndoPoint();
-            addBox(item.w, item.h, item.d, item.color, item.weight, item.label);
+            addBox(item.w, item.h, item.d, item.color, item.weight, item.label, { price: item.price ?? 0 });
             refreshHistoryButtons();
         });
     });
