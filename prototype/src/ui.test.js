@@ -68,8 +68,8 @@ const { initUI, isSnapEnabled, isLabelsEnabled, refreshHistoryButtons } = await 
 // Not the full Tailwind markup — just the seams this module touches.
 function mountFixture() {
     document.body.innerHTML = `
-        <input type="checkbox" id="toggle-snap" checked>
-        <input type="checkbox" id="toggle-labels" checked>
+        <button id="toggle-snap" aria-pressed="true"></button>
+        <button id="toggle-labels" aria-pressed="true"></button>
 
         <div id="ui-container" class="max-h-16 overflow-hidden">
             <button id="panel-toggle" aria-expanded="false"></button>
@@ -223,18 +223,43 @@ beforeEach(() => {
 });
 
 describe('isSnapEnabled', () => {
-    it('reflects the checkbox state', () => {
+    it('reflects the button\'s pressed state', () => {
         expect(isSnapEnabled()).toBe(true);
-        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('toggle-snap').setAttribute('aria-pressed', 'false');
         expect(isSnapEnabled()).toBe(false);
     });
 });
 
 describe('isLabelsEnabled', () => {
-    it('reflects the checkbox state', () => {
+    it('reflects the button\'s pressed state', () => {
         expect(isLabelsEnabled()).toBe(true);
-        document.getElementById('toggle-labels').checked = false;
+        document.getElementById('toggle-labels').setAttribute('aria-pressed', 'false');
         expect(isLabelsEnabled()).toBe(false);
+    });
+});
+
+describe('view toggle buttons (Einrasten / Objektnamen)', () => {
+    it('flips aria-pressed and the active styling on click, and back again', () => {
+        const btn = document.getElementById('toggle-snap');
+        expect(btn.getAttribute('aria-pressed')).toBe('true');
+
+        btn.click();
+        expect(btn.getAttribute('aria-pressed')).toBe('false');
+        expect(btn.classList.contains('bg-blue-500/10')).toBe(false);
+        expect(btn.classList.contains('bg-white/5')).toBe(true);
+        expect(isSnapEnabled()).toBe(false);
+
+        btn.click();
+        expect(btn.getAttribute('aria-pressed')).toBe('true');
+        expect(btn.classList.contains('bg-blue-500/10')).toBe(true);
+        expect(btn.classList.contains('bg-white/5')).toBe(false);
+        expect(isSnapEnabled()).toBe(true);
+    });
+
+    it('toggles the labels button independently from the snap button', () => {
+        document.getElementById('toggle-labels').click();
+        expect(isLabelsEnabled()).toBe(false);
+        expect(isSnapEnabled()).toBe(true); // untouched
     });
 });
 
@@ -769,7 +794,7 @@ describe('object list panel', () => {
         objects.push(obj);
         refreshHistoryButtons();
         captureUndoPoint.mockClear();
-        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('toggle-snap').setAttribute('aria-pressed', 'false');
 
         document.querySelector('#object-list button[data-action="up"]').click();
         expect(captureUndoPoint).toHaveBeenCalled();
@@ -804,7 +829,7 @@ describe('object list panel', () => {
         objects.push(obj);
         refreshHistoryButtons();
         captureUndoPoint.mockClear();
-        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('toggle-snap').setAttribute('aria-pressed', 'false');
 
         document.querySelector('#object-list button[data-action="rotate"]').click();
         expect(captureUndoPoint).toHaveBeenCalled();
@@ -828,7 +853,7 @@ describe('object list panel', () => {
         objects.push(obj);
         refreshHistoryButtons();
         captureUndoPoint.mockClear();
-        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('toggle-snap').setAttribute('aria-pressed', 'false');
 
         document.querySelector('#object-list button[data-action="rotate-x"]').click();
         expect(captureUndoPoint).toHaveBeenCalled();
@@ -1093,7 +1118,7 @@ describe('edit-dimensions modal', () => {
         document.getElementById('edit-dims-w').value = '70';
         document.getElementById('edit-dims-h').value = '50';
         document.getElementById('edit-dims-d').value = '45';
-        document.getElementById('toggle-snap').checked = false;
+        document.getElementById('toggle-snap').setAttribute('aria-pressed', 'false');
         document.getElementById('edit-dims-form').dispatchEvent(new Event('submit', { cancelable: true }));
 
         expect(captureUndoPoint).toHaveBeenCalled();
