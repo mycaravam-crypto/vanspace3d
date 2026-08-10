@@ -31,6 +31,9 @@ vi.mock('./persistence.js', () => ({
     loadNamedProject: vi.fn(() => true),
     deleteNamedProject: vi.fn(() => true),
     renameNamedProject: vi.fn(() => true),
+    listCustomLibrary: vi.fn(() => []),
+    saveCustomLibraryEntry: vi.fn(() => ({})),
+    deleteCustomLibraryEntry: vi.fn(() => true),
 }));
 vi.mock('./pdfExport.js', () => ({
     exportSchematicPdfToFile: vi.fn(),
@@ -56,6 +59,7 @@ const {
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
     importFromText, listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
+    listCustomLibrary, saveCustomLibraryEntry, deleteCustomLibraryEntry,
 } = await import('./persistence.js');
 const { exportSchematicPdfToFile } = await import('./pdfExport.js');
 const { captureUndoPoint, canUndo, canRedo } = await import('./history.js');
@@ -90,6 +94,7 @@ function mountFixture() {
         <form id="custom-object-form">
             <input id="custom-name" value="">
             <input type="checkbox" id="custom-fixed">
+            <input type="checkbox" id="custom-save-library">
             <input id="custom-w" value="50">
             <p id="custom-w-error"></p>
             <input id="custom-h" value="40">
@@ -214,6 +219,12 @@ beforeEach(() => {
     deleteNamedProject.mockReturnValue(true);
     renameNamedProject.mockClear();
     renameNamedProject.mockReturnValue(true);
+    listCustomLibrary.mockClear();
+    listCustomLibrary.mockReturnValue([]);
+    saveCustomLibraryEntry.mockClear();
+    saveCustomLibraryEntry.mockReturnValue({});
+    deleteCustomLibraryEntry.mockClear();
+    deleteCustomLibraryEntry.mockReturnValue(true);
     captureUndoPoint.mockClear();
     canUndo.mockClear();
     canUndo.mockReturnValue(false);
@@ -517,6 +528,74 @@ describe('standard library rendering', () => {
         const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
         expect(btn.textContent).toContain(`${Math.round(first.w * 100)}x${Math.round(first.d * 100)}x${Math.round(first.h * 100)}`);
     });
+
+    describe('user-saved custom entries', () => {
+        const customEntry = {
+            id: 'custom-1', label: 'Werkzeugkiste', w: 0.3, h: 0.2, d: 0.4, color: '#10b981', weight: 4, price: 0,
+        };
+
+        it('renders custom entries alongside the built-ins', () => {
+            listCustomLibrary.mockReturnValue([customEntry]);
+            mountFixture();
+            initUI();
+
+            const buttons = document.querySelectorAll('#standard-library-list button[data-lib-id]');
+            expect(buttons).toHaveLength(STANDARD_LIBRARY.length + 1);
+            expect(document.querySelector('#standard-library-list button[data-lib-id="custom-1"]').textContent).toContain('Werkzeugkiste');
+        });
+
+        it('shows a delete button only for custom entries, not for built-ins', () => {
+            listCustomLibrary.mockReturnValue([customEntry]);
+            mountFixture();
+            initUI();
+
+            expect(document.querySelector('button[data-remove-custom-lib-id="custom-1"]')).not.toBeNull();
+            expect(document.querySelector(`button[data-remove-custom-lib-id="${STANDARD_LIBRARY[0].id}"]`)).toBeNull();
+        });
+
+        it('deletes a custom entry and re-renders without it when its delete button is clicked', () => {
+            listCustomLibrary.mockReturnValue([customEntry]);
+            mountFixture();
+            initUI();
+
+            listCustomLibrary.mockReturnValue([]); // simulate the entry now being gone from storage
+            document.querySelector('button[data-remove-custom-lib-id="custom-1"]').click();
+
+            expect(deleteCustomLibraryEntry).toHaveBeenCalledWith('custom-1');
+            expect(document.querySelector('#standard-library-list button[data-lib-id="custom-1"]')).toBeNull();
+        });
+
+        it('escapes a custom entry\'s saved label so it cannot inject a live element', () => {
+            listCustomLibrary.mockReturnValue([{ ...customEntry, label: '<img src=x onerror=alert(1)>' }]);
+            mountFixture();
+            initUI();
+
+            // The label may still appear as literal, inert text (<>  are not
+            // special inside HTML text content or an attribute value) — what
+            // matters is that no actual <img> element was created from it.
+            expect(document.querySelector('#standard-library-list img')).toBeNull();
+        });
+
+        it('escapes a double quote in a saved label so it cannot break out of the title attribute', () => {
+            listCustomLibrary.mockReturnValue([{ ...customEntry, label: 'a" onmouseover="alert(1)' }]);
+            mountFixture();
+            initUI();
+
+            const btn = document.querySelector('#standard-library-list button[data-lib-id="custom-1"]');
+            expect(btn.getAttribute('onmouseover')).toBeNull();
+        });
+
+        it('passes the fixed option through to addBox when clicking a custom entry saved as fixed', () => {
+            listCustomLibrary.mockReturnValue([{
+                id: 'custom-fixed-1', label: 'Bett', w: 1.8, h: 0.15, d: 0.6, color: '#10b981', weight: 20, price: 0, fixed: true,
+            }]);
+            mountFixture();
+            initUI();
+
+            document.querySelector('#standard-library-list button[data-lib-id="custom-fixed-1"]').click();
+            expect(addBox).toHaveBeenCalledWith(1.8, 0.15, 0.6, '#10b981', 20, 'Bett', { price: 0, fixed: true });
+        });
+    });
 });
 
 describe('object panel buttons', () => {
@@ -672,6 +751,47 @@ describe('object panel buttons', () => {
 
             expect(addBox).not.toHaveBeenCalled();
             expect(checkbox.checked).toBe(true);
+        });
+    });
+
+    describe('"In Bibliothek speichern" checkbox', () => {
+        it('does not save to the library when left unchecked', () => {
+            document.getElementById('add-custom').click();
+            expect(saveCustomLibraryEntry).not.toHaveBeenCalled();
+        });
+
+        it('saves the submitted object as a new library entry when checked', () => {
+            document.getElementById('custom-name').value = 'Werkzeugkiste';
+            document.getElementById('custom-save-library').checked = true;
+            document.getElementById('add-custom').click();
+
+            expect(saveCustomLibraryEntry).toHaveBeenCalledWith({
+                label: 'Werkzeugkiste', w: 0.5, h: 0.4, d: 0.8, color: '#10b981', weight: 5, price: 0, fixed: false,
+            });
+        });
+
+        it('passes fixed:true through when "Fest verbaut" is also checked', () => {
+            document.getElementById('custom-fixed').checked = true;
+            document.getElementById('custom-save-library').checked = true;
+            document.getElementById('add-custom').click();
+
+            expect(saveCustomLibraryEntry).toHaveBeenCalledWith(expect.objectContaining({ fixed: true }));
+        });
+
+        it('unchecks itself after a successful save, so the next add is not saved again', () => {
+            const checkbox = document.getElementById('custom-save-library');
+            checkbox.checked = true;
+            document.getElementById('add-custom').click();
+            expect(checkbox.checked).toBe(false);
+        });
+
+        it('does not save to the library when validation rejects the submission', () => {
+            document.getElementById('custom-save-library').checked = true;
+            document.getElementById('custom-w').value = '-5';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(saveCustomLibraryEntry).not.toHaveBeenCalled();
         });
     });
 

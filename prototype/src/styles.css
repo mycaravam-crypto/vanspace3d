@@ -16,9 +16,9 @@ body {
 #ui-container::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.35); border-radius: 4px; }
 #ui-container::-webkit-scrollbar-thumb:hover { background: rgba(148, 163, 184, 0.55); }
 
-#object-list::-webkit-scrollbar, #project-list::-webkit-scrollbar, #help-modal ::-webkit-scrollbar { width: 5px; }
-#object-list::-webkit-scrollbar-track, #project-list::-webkit-scrollbar-track { background: transparent; }
-#object-list::-webkit-scrollbar-thumb, #project-list::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
+#object-list::-webkit-scrollbar, #project-list::-webkit-scrollbar, #standard-library-list::-webkit-scrollbar, #help-modal ::-webkit-scrollbar { width: 5px; }
+#object-list::-webkit-scrollbar-track, #project-list::-webkit-scrollbar-track, #standard-library-list::-webkit-scrollbar-track { background: transparent; }
+#object-list::-webkit-scrollbar-thumb, #project-list::-webkit-scrollbar-thumb, #standard-library-list::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.3); border-radius: 4px; }
 
 .tab-btn { border-radius: 0.5rem; transition: all 0.2s ease; }
 .tab-btn.active { color: #fff; background: rgba(255, 255, 255, 0.1); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3); }

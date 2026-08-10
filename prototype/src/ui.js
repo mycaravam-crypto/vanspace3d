@@ -10,6 +10,7 @@ import {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, importFromText,
     sanitizeFilename,
     listProjects, saveNamedProject, loadNamedProject, deleteNamedProject, renameNamedProject,
+    listCustomLibrary, saveCustomLibraryEntry, deleteCustomLibraryEntry,
 } from './persistence.js';
 import { exportSchematicPdfToFile } from './pdfExport.js';
 import { captureUndoPoint, undo, redo, canUndo, canRedo } from './history.js';
@@ -286,16 +287,28 @@ const LIBRARY_ACCENT_CLASSES = {
 
 // A small color swatch showing the object's actual 3D color reads as a more
 // direct "icon" for what you're about to place than an abstract accent
-// stripe — same numeric color used for the box mesh itself (see library.js).
-function swatchHex(colorInt) {
-    return `#${colorInt.toString(16).padStart(6, '0')}`;
+// stripe — same color used for the box mesh itself (see library.js).
+// STANDARD_LIBRARY entries store it as a numeric 0xRRGGBB (Three.js's native
+// format), but user-saved custom entries store it as the '#rrggbb' string
+// straight out of the <input type="color"> that created them — accept both.
+function swatchHex(color) {
+    return typeof color === 'string' ? color : `#${color.toString(16).padStart(6, '0')}`;
 }
 
+// Renders STANDARD_LIBRARY plus any user-saved custom entries (see the
+// "In Bibliothek speichern" checkbox in the custom-object form below) as one
+// merged grid. Custom entries get an extra hover-revealed delete button;
+// built-ins don't since they aren't the user's to remove.
 function renderStandardLibrary() {
     const container = document.getElementById('standard-library-list');
     if (!container) return;
 
-    container.innerHTML = STANDARD_LIBRARY.map((item) => {
+    const libraryItems = [
+        ...STANDARD_LIBRARY,
+        ...listCustomLibrary().map((item) => ({ ...item, isCustom: true })),
+    ];
+
+    container.innerHTML = libraryItems.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
         const dims = `${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}`;
         // Only shown when the entry actually has one — most non-Eurobox
@@ -306,25 +319,44 @@ function renderStandardLibrary() {
         // with both the label and dims already fighting for space in a
         // 2-column grid this narrow, adding a third/fourth value to the
         // on-card text overlapped/overflowed it (see truncate below); the
-        // full detail is still one hover away.
-        const tooltip = `${item.label}: ${dims}cm, ${item.weight}kg${priceSuffix}`;
+        // full detail is still one hover away. Label is escaped here (unlike
+        // the built-in entries' hardcoded labels) since custom entries carry
+        // a user-typed name through localStorage back into this markup.
+        const safeLabel = escapeHtml(item.label);
+        const tooltip = `${safeLabel}: ${dims}cm, ${item.weight}kg${priceSuffix}`;
+        const deleteBtn = item.isCustom ? `
+            <button type="button" class="absolute top-1 right-1 w-4 h-4 flex items-center justify-center rounded-full text-slate-500 hover:text-red-400 hover:bg-red-500/10 opacity-0 group-hover/lib-card:opacity-100 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400/60 transition-opacity" data-remove-custom-lib-id="${item.id}" title="&quot;${safeLabel}&quot; aus Bibliothek entfernen" aria-label="&quot;${safeLabel}&quot; aus Bibliothek entfernen">
+                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>` : '';
         return `
-        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${tooltip}">
-            <span class="flex items-center gap-1.5 min-w-0">
-                <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
-                <span class="text-sm font-medium text-slate-300 truncate">${item.label}</span>
-            </span>
-            <span class="text-[10px] text-slate-500 font-mono truncate">${dims}</span>
-        </button>
+        <div class="relative group/lib-card">
+            <button class="flex flex-col items-start gap-1 w-full px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${tooltip}">
+                <span class="flex items-center gap-1.5 min-w-0">
+                    <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
+                    <span class="text-sm font-medium text-slate-300 truncate">${safeLabel}</span>
+                </span>
+                <span class="text-[10px] text-slate-500 font-mono truncate">${dims}</span>
+            </button>${deleteBtn}
+        </div>
     `;
     }).join('');
 
     container.querySelectorAll('button[data-lib-id]').forEach((btn) => {
-        const item = STANDARD_LIBRARY.find((i) => i.id === btn.dataset.libId);
+        const item = libraryItems.find((i) => i.id === btn.dataset.libId);
         btn.addEventListener('click', () => {
             captureUndoPoint();
-            addBox(item.w, item.h, item.d, item.color, item.weight, item.label, { price: item.price ?? 0 });
+            const options = { price: item.price ?? 0 };
+            if (item.fixed) options.fixed = true;
+            addBox(item.w, item.h, item.d, item.color, item.weight, item.label, options);
             refreshHistoryButtons();
+        });
+    });
+
+    container.querySelectorAll('button[data-remove-custom-lib-id]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteCustomLibraryEntry(btn.dataset.removeCustomLibId);
+            renderStandardLibrary();
         });
     });
 }
@@ -378,6 +410,14 @@ function resetFixedToggle() {
     if (!fixedCheckbox || !weightInput || !fixedCheckbox.checked) return;
     fixedCheckbox.checked = false;
     applyFixedToggleState(fixedCheckbox, weightInput);
+}
+
+// Un-checks "In Bibliothek speichern" after a successful add, same reasoning
+// as resetFixedToggle() above — otherwise every object generated afterward
+// silently gets saved as another library entry until the user notices.
+function resetSaveToLibraryToggle() {
+    const checkbox = document.getElementById('custom-save-library');
+    if (checkbox) checkbox.checked = false;
 }
 
 function setCustomFieldError(field, message) {
@@ -446,7 +486,18 @@ function initObjectPanel() {
         } else {
             addBox(w, h, d, c, rawWeight, label);
         }
+
+        const saveToLibraryEl = document.getElementById('custom-save-library');
+        if (saveToLibraryEl && saveToLibraryEl.checked) {
+            saveCustomLibraryEntry({
+                label, w, h, d, color: c, weight: rawWeight, price: rawPrice, fixed: isFixed,
+            });
+            renderStandardLibrary();
+            showStatus('In Bibliothek gespeichert ✓');
+        }
+
         resetFixedToggle();
+        resetSaveToLibraryToggle();
         refreshHistoryButtons();
     });
 
