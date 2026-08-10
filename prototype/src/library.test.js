@@ -45,4 +45,11 @@ describe('STANDARD_LIBRARY', () => {
             expect(item.weight).toBeLessThan(100); // a single Eurobox-sized item, not a pallet
         });
     });
+
+    it('gives every Eurobox a sane, positive price in EUR', () => {
+        STANDARD_LIBRARY.filter((item) => item.id.startsWith('eb-')).forEach((item) => {
+            expect(item.price).toBeGreaterThan(0);
+            expect(item.price).toBeLessThan(100); // a single empty Eurobox, not a pallet of them
+        });
+    });
 });

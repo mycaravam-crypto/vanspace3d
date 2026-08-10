@@ -445,11 +445,13 @@ describe('standard library rendering', () => {
         expect(buttons).toHaveLength(STANDARD_LIBRARY.length);
     });
 
-    it('calls addBox with the exact dimensions/color/weight/label for every library entry', () => {
+    it('calls addBox with the exact dimensions/color/weight/label/price for every library entry', () => {
         STANDARD_LIBRARY.forEach((item) => {
             addBox.mockClear();
             document.querySelector(`#standard-library-list button[data-lib-id="${item.id}"]`).click();
-            expect(addBox).toHaveBeenCalledWith(item.w, item.h, item.d, item.color, item.weight, item.label);
+            expect(addBox).toHaveBeenCalledWith(
+                item.w, item.h, item.d, item.color, item.weight, item.label, { price: item.price ?? 0 },
+            );
         });
     });
 
@@ -457,6 +459,18 @@ describe('standard library rendering', () => {
         const first = STANDARD_LIBRARY[0];
         const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
         expect(btn.textContent).toContain(`${first.weight}kg`);
+    });
+
+    it('shows the price in the button label for a Eurobox entry', () => {
+        const eurobox = STANDARD_LIBRARY.find((item) => item.price > 0);
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${eurobox.id}"]`);
+        expect(btn.textContent).toContain(`${eurobox.price.toFixed(2)}€`);
+    });
+
+    it('omits the price from the button label for an entry without one', () => {
+        const noPrice = STANDARD_LIBRARY.find((item) => !(item.price > 0));
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${noPrice.id}"]`);
+        expect(btn.textContent).not.toContain('€');
     });
 
     it('captures an undo point before adding a library object', () => {
