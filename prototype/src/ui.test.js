@@ -455,22 +455,30 @@ describe('standard library rendering', () => {
         });
     });
 
-    it('shows the weight in the button label', () => {
-        const first = STANDARD_LIBRARY[0];
-        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
-        expect(btn.textContent).toContain(`${first.weight}kg`);
-    });
-
-    it('shows the price in the button label for a Eurobox entry', () => {
+    it('keeps weight/price out of the visible card label, showing only dimensions', () => {
         const eurobox = STANDARD_LIBRARY.find((item) => item.price > 0);
         const btn = document.querySelector(`#standard-library-list button[data-lib-id="${eurobox.id}"]`);
-        expect(btn.textContent).toContain(`${eurobox.price.toFixed(2)}€`);
+        expect(btn.textContent).not.toContain(`${eurobox.weight}kg`);
+        expect(btn.textContent).not.toContain('€');
+        expect(btn.textContent).toContain(`${Math.round(eurobox.w * 100)}x${Math.round(eurobox.d * 100)}x${Math.round(eurobox.h * 100)}`);
     });
 
-    it('omits the price from the button label for an entry without one', () => {
+    it('shows the weight in the tooltip', () => {
+        const first = STANDARD_LIBRARY[0];
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${first.id}"]`);
+        expect(btn.title).toContain(`${first.weight}kg`);
+    });
+
+    it('shows the price in the tooltip for a Eurobox entry', () => {
+        const eurobox = STANDARD_LIBRARY.find((item) => item.price > 0);
+        const btn = document.querySelector(`#standard-library-list button[data-lib-id="${eurobox.id}"]`);
+        expect(btn.title).toContain(`${eurobox.price.toFixed(2)}€`);
+    });
+
+    it('omits the price from the tooltip for an entry without one', () => {
         const noPrice = STANDARD_LIBRARY.find((item) => !(item.price > 0));
         const btn = document.querySelector(`#standard-library-list button[data-lib-id="${noPrice.id}"]`);
-        expect(btn.textContent).not.toContain('€');
+        expect(btn.title).not.toContain('€');
     });
 
     it('captures an undo point before adding a library object', () => {
