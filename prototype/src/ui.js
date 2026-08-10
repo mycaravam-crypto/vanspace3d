@@ -267,16 +267,24 @@ function renderStandardLibrary() {
 
     container.innerHTML = STANDARD_LIBRARY.map((item) => {
         const accent = LIBRARY_ACCENT_CLASSES[item.accent] || LIBRARY_ACCENT_CLASSES.blue;
+        const dims = `${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}`;
         // Only shown when the entry actually has one — most non-Eurobox
-        // entries don't, and a "0.00€" on every card would just be noise.
+        // entries don't, and a "0.00€" on every card/tooltip would just be
+        // noise.
         const priceSuffix = item.price > 0 ? `, ${item.price.toFixed(2)}€` : '';
+        // Weight and price live only in the tooltip, not the visible card —
+        // with both the label and dims already fighting for space in a
+        // 2-column grid this narrow, adding a third/fourth value to the
+        // on-card text overlapped/overflowed it (see truncate below); the
+        // full detail is still one hover away.
+        const tooltip = `${item.label}: ${dims}cm, ${item.weight}kg${priceSuffix}`;
         return `
-        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${item.label}: ${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)}cm, ${item.weight}kg${priceSuffix}">
+        <button class="flex flex-col items-start gap-1 px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${tooltip}">
             <span class="flex items-center gap-1.5 min-w-0">
                 <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
                 <span class="text-sm font-medium text-slate-300 truncate">${item.label}</span>
             </span>
-            <span class="text-[10px] text-slate-500 font-mono truncate">${Math.round(item.w * 100)}x${Math.round(item.d * 100)}x${Math.round(item.h * 100)} &middot; ${item.weight}kg${priceSuffix}</span>
+            <span class="text-[10px] text-slate-500 font-mono truncate">${dims}</span>
         </button>
     `;
     }).join('');
