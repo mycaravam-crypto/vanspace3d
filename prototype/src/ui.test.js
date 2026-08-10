@@ -594,6 +594,38 @@ describe('object panel buttons', () => {
             expect(addBox).not.toHaveBeenCalled();
             expect(document.getElementById('custom-w-error').textContent).not.toBe('');
         });
+
+        it('unchecks itself and re-enables the weight field after a successful add, so the next object defaults back to movable cargo', () => {
+            const checkbox = document.getElementById('custom-fixed');
+            const weightInput = document.getElementById('custom-weight');
+
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+            document.getElementById('add-custom').click();
+
+            expect(checkbox.checked).toBe(false);
+            expect(weightInput.disabled).toBe(false);
+
+            document.getElementById('add-custom').click();
+            expect(addBox).toHaveBeenLastCalledWith(0.5, 0.4, 0.8, '#10b981', 5, 'Eigenes Objekt');
+        });
+
+        it('leaves the checkbox unchecked (a no-op) when the add was already for a movable object', () => {
+            const checkbox = document.getElementById('custom-fixed');
+            document.getElementById('add-custom').click();
+            expect(checkbox.checked).toBe(false);
+        });
+
+        it('does not uncheck itself when validation rejects the submission', () => {
+            const checkbox = document.getElementById('custom-fixed');
+            checkbox.checked = true;
+            checkbox.dispatchEvent(new Event('change'));
+            document.getElementById('custom-w').value = '-5';
+            document.getElementById('add-custom').click();
+
+            expect(addBox).not.toHaveBeenCalled();
+            expect(checkbox.checked).toBe(true);
+        });
     });
 
     it('clears unlocked objects (sparing locked ones) and captures an undo point first', () => {
