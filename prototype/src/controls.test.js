@@ -26,6 +26,7 @@ vi.mock('./objects.js', () => ({
     moveVertical: vi.fn(),
     moveHorizontal: vi.fn(),
     flashReject: vi.fn(),
+    isExplodedEnabled: vi.fn(() => false),
     // selection.js imports this from the (mocked) './objects.js' too — a
     // no-op stub is enough since these tests assert on userData.selected
     // directly, not the visual edge-color side effect.
@@ -44,6 +45,7 @@ const { camera, renderer } = await import('./scene.js');
 const { vanState, objects, DEFAULT_VAN_STATE } = await import('./state.js');
 const {
     rotate90, rotateX90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
+    isExplodedEnabled,
 } = await import('./objects.js');
 const { syncSlidersFromState, refreshHistoryButtons } = await import('./ui.js');
 const { captureUndoPoint, undo, redo } = await import('./history.js');
@@ -139,6 +141,8 @@ beforeEach(() => {
     moveVertical.mockClear();
     moveHorizontal.mockClear();
     flashReject.mockClear();
+    isExplodedEnabled.mockClear();
+    isExplodedEnabled.mockReturnValue(false);
     captureUndoPoint.mockClear();
     undo.mockClear();
     undo.mockReturnValue(false);
@@ -362,6 +366,42 @@ describe('drag lifecycle', () => {
         mesh.position.set(0, 0.05, 0); // below height/2 — would normally get floor-snapped
 
         fire('dragstart', mesh);
+        fire('dragend', mesh);
+
+        expect(mesh.position.y).toBeCloseTo(0.05); // untouched
+    });
+
+    it('rejects dragstart while exploded: no undo capture, camera orbit stays enabled', () => {
+        isExplodedEnabled.mockReturnValue(true);
+        const mesh = makeTrackedBox();
+        mesh.position.set(0, 0.16, 0);
+
+        fire('dragstart', mesh);
+
+        expect(captureUndoPoint).not.toHaveBeenCalled();
+        expect(flashReject).toHaveBeenCalledWith(mesh);
+        expect(orbitControls.enabled).toBe(true);
+    });
+
+    it('snaps back to its pre-drag position every tick while exploded', () => {
+        isExplodedEnabled.mockReturnValue(true);
+        const mesh = makeTrackedBox();
+        mesh.position.set(0, 0.16, -1.0);
+
+        fire('dragstart', mesh);
+        mesh.position.set(0.4, 0.16, -0.5); // simulate DragControls' own direct mutation
+        fire('drag', mesh);
+
+        expect(mesh.position.x).toBeCloseTo(0);
+        expect(mesh.position.z).toBeCloseTo(-1.0);
+    });
+
+    it('skips the floor-snap on dragend while exploded', () => {
+        const mesh = makeTrackedBox(0.6, 0.32, 0.4);
+        mesh.position.set(0, 0.05, 0); // below height/2 — would normally get floor-snapped
+        fire('dragstart', mesh);
+
+        isExplodedEnabled.mockReturnValue(true);
         fire('dragend', mesh);
 
         expect(mesh.position.y).toBeCloseTo(0.05); // untouched

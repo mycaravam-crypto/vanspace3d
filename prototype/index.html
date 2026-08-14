@@ -36,6 +36,14 @@
             <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8Z"/><circle cx="12" cy="12" r="3"/></svg>
             <span>R&ouml;ntgen</span>
         </button>
+        <!-- Explode toggle — same persistent on/off pattern as the x-ray
+             button above (see initExplodeToggle() in ui.js), pushes every
+             object outward from the van's origin to separate stacked/
+             adjacent cargo instead of making them see-through. -->
+        <button id="cam-explode" type="button" class="flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 rounded-lg hover:bg-white/10 hover:text-blue-300 active:bg-white/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 border-l border-white/10 ml-0.5 pl-2.5 transition-colors" title="Explosionsansicht (Objekte auseinanderziehen)" aria-pressed="false">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8V4m0 0h4M4 4l5 5"/><path d="M20 8V4m0 0h-4m4 0l-5 5"/><path d="M4 16v4m0 0h4m-4 0l5-5"/><path d="M20 16v4m0 0h-4m4 0l-5-5"/></svg>
+            <span>Explosion</span>
+        </button>
     </div>
 
     <!-- Floating rotate/color handles — track the single selected object's

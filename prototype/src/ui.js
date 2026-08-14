@@ -2,7 +2,7 @@ import { vanState, DEFAULT_VAN_STATE, objects } from './state.js';
 import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled, renameObject, parkObject, returnObjectToVan,
+    rotateX90, flashReject, setXrayEnabled, setExplodedEnabled, renameObject, parkObject, returnObjectToVan,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -786,6 +786,26 @@ function initXrayToggle() {
     });
 }
 
+// Explode toggle — pushes every non-parked object outward from the van's
+// origin so stacked/adjacent cargo is easier to tell apart (see
+// setExplodedEnabled() in objects.js, which also refuses dragging/resizing/
+// rotating while it's active). Same persistent on/off pattern as
+// initXrayToggle() above, kept as its own function since the two are
+// independent toggles a user can combine.
+function initExplodeToggle() {
+    const btn = document.getElementById('cam-explode');
+    if (!btn) return;
+
+    let active = false;
+    btn.addEventListener('click', () => {
+        active = !active;
+        setExplodedEnabled(active);
+        btn.classList.toggle('text-blue-300', active);
+        btn.classList.toggle('bg-blue-500/10', active);
+        btn.setAttribute('aria-pressed', String(active));
+    });
+}
+
 // ==========================================
 // UNDO / REDO
 // ==========================================
@@ -1006,6 +1026,7 @@ export function initUI() {
     initNamedProjects();
     initCameraToolbar();
     initXrayToggle();
+    initExplodeToggle();
     initHelpModal();
 
     // Resume the last saved project on startup if there is one, otherwise

@@ -16,7 +16,7 @@ const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, DEFAULT_PRICE, isXrayEnabled, setXrayEnabled,
-    renameObject, isParked, parkObject, returnObjectToVan,
+    renameObject, isParked, parkObject, returnObjectToVan, isExplodedEnabled, setExplodedEnabled,
 } = await import('./objects.js');
 
 beforeEach(() => {
@@ -807,6 +807,122 @@ describe('x-ray view', () => {
         const mesh = addBox(0.5, 0.5, 0.5, 0x64748b);
         expect(mesh.material.transparent).toBe(true);
         expect(mesh.material.opacity).toBeLessThan(1);
+    });
+});
+
+describe('explode view', () => {
+    afterEach(() => setExplodedEnabled(false)); // module-level flag — leave it as the app's own default
+
+    it('starts disabled, leaving objects at their placed position', () => {
+        expect(isExplodedEnabled()).toBe(false);
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        expect(mesh.userData.explodeOffset).toBeUndefined();
+    });
+
+    it('pushes every currently tracked object outward from the van origin, by the fixed explode distance', () => {
+        const a = addBox(0.5, 0.3, 0.5, 0x64748b);
+        a.position.set(0.5, 0.15, 1.0);
+        const before = a.position.clone();
+
+        setExplodedEnabled(true);
+
+        expect(isExplodedEnabled()).toBe(true);
+        expect(a.position.equals(before)).toBe(false);
+        expect(a.position.distanceTo(before)).toBeCloseTo(0.5); // EXPLODE_DISTANCE
+    });
+
+    it('restores the exact original position when turned back off', () => {
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        mesh.position.set(0.4, 0.2, -1.0);
+        const before = mesh.position.clone();
+
+        setExplodedEnabled(true);
+        setExplodedEnabled(false);
+
+        expect(mesh.position.x).toBeCloseTo(before.x);
+        expect(mesh.position.y).toBeCloseTo(before.y);
+        expect(mesh.position.z).toBeCloseTo(before.z);
+        expect(mesh.userData.explodeOffset).toBeUndefined();
+    });
+
+    it('never pushes an object below its own resting height, even dead-center over the van origin', () => {
+        const mesh = addBox(0.3, 0.2, 0.3, 0x64748b);
+        mesh.position.set(0, 0.1, 0); // exactly on the van's centerline, low to the floor
+
+        setExplodedEnabled(true);
+
+        expect(mesh.position.y).toBeGreaterThanOrEqual(0.1);
+    });
+
+    it('applies the current explode state to objects created afterward', () => {
+        setExplodedEnabled(true);
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        expect(mesh.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
+    });
+
+    it('skips parked objects', () => {
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        parkObject(mesh);
+        const parkedPos = mesh.position.clone();
+
+        setExplodedEnabled(true);
+
+        expect(mesh.position.equals(parkedPos)).toBe(true);
+        expect(mesh.userData.explodeOffset).toBeUndefined();
+    });
+
+    it('blocks moveVertical/moveHorizontal while active, flashing reject instead', () => {
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        setExplodedEnabled(true);
+        const before = mesh.position.clone();
+
+        expect(moveVertical(mesh, 0.05, true)).toBe(false);
+        expect(moveHorizontal(mesh, 'x', 0.05, true)).toBe(false);
+        expect(mesh.position.equals(before)).toBe(true);
+    });
+
+    it('blocks resizeObject while active', () => {
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        setExplodedEnabled(true);
+
+        expect(resizeObject(mesh, 0.6, 0.4, 0.6, true)).toBe(false);
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.5, height: 0.3, depth: 0.5 });
+    });
+
+    it('blocks rotate90/rotateX90 while active', () => {
+        const mesh = addBox(0.5, 0.3, 0.6, 0x64748b);
+        setExplodedEnabled(true);
+
+        expect(rotate90(mesh, true)).toBe(false);
+        expect(rotateX90(mesh, true)).toBe(false);
+        expect(mesh.geometry.parameters).toMatchObject({ width: 0.5, height: 0.3, depth: 0.6 });
+    });
+
+    it('duplicates near the original\'s true (non-exploded) position, exploding the copy too', () => {
+        const mesh = addBox(0.4, 0.3, 0.4, 0x64748b);
+        mesh.position.set(0.3, 0.15, -0.5);
+        setExplodedEnabled(true);
+        const truePos = mesh.position.clone().sub(mesh.userData.explodeOffset);
+
+        const copy = duplicateObject(mesh);
+
+        expect(copy.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
+        const copyTruePos = copy.position.clone().sub(copy.userData.explodeOffset);
+        expect(copyTruePos.x).toBeCloseTo(truePos.x + 0.1);
+        expect(copyTruePos.z).toBeCloseTo(truePos.z + 0.1);
+    });
+
+    it('parking clears the offset; returning re-applies it if explode is still active', () => {
+        const mesh = addBox(0.4, 0.3, 0.4, 0x64748b);
+        mesh.position.set(0.3, 0.15, -0.5);
+        setExplodedEnabled(true);
+        expect(mesh.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
+
+        parkObject(mesh);
+        expect(mesh.userData.explodeOffset).toBeUndefined();
+
+        returnObjectToVan(mesh);
+        expect(mesh.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
     });
 });
 
