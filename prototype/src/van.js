@@ -24,6 +24,32 @@ function disposeGroup(group) {
     }
 }
 
+// A real wheel arch is a rounded bump the tire housing pushes up into the
+// cargo area — not a squared-off block — so its cross-section (looking from
+// the rear, in the X/Y plane) is built as a half-ellipse: flat along the
+// floor (y=0) from one edge of the arch to the other, curving up to a
+// rounded peak of `height` at the center, then swept the full `depth` of the
+// rear section along Z (capped at both ends by ExtrudeGeometry, unlike a
+// plain half-cylinder sweep). Independent width/height radii (rather than a
+// true circle) keep it fully driven by the same narrowWidth/archHeight
+// config the old box used, so it still reshapes correctly as those sliders
+// change — no new configuration needed.
+function createWheelArchGeometry(width, height, depth) {
+    const shape = new THREE.Shape();
+    const segments = 24;
+    shape.moveTo(-width / 2, 0);
+    for (let i = 1; i < segments; i++) {
+        const t = Math.PI * (1 - i / segments); // sweeps PI -> 0, left edge to right edge
+        shape.lineTo(Math.cos(t) * (width / 2), Math.sin(t) * height);
+    }
+    shape.lineTo(width / 2, 0);
+    shape.closePath(); // back along the floor (y=0) to the start
+
+    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: segments });
+    geo.translate(0, 0, -depth / 2); // center on Z like every other geometry here (BoxGeometry is origin-centered)
+    return geo;
+}
+
 // Reusable function for transparent bounding boxes
 function createVanZone(w, h, l, yPos, colorHex) {
     const geo = new THREE.BoxGeometry(w, h, l);
@@ -95,19 +121,24 @@ export function buildVanGeometry() {
         rearFloor.receiveShadow = true;
         vanGroup.add(rearFloor);
 
-        // Wheel arch solid representation
+        // Wheel arch solid representation — a rounded dome (see
+        // createWheelArchGeometry() above), not a squared-off block. Its
+        // bounding footprint (archWidth x archHeight, spanning the same
+        // narrowWidth-to-maxWidth gap) is unchanged, so clampToVan()
+        // (collision.js) keeps treating that footprint as off-limits —
+        // conservative but safe, since the dome is always inscribed inside it.
         const archWidth = Math.max(0, (vanState.maxWidth - vanState.narrowWidth) / 2);
         if (archWidth > 0.01) {
-            const archGeo = new THREE.BoxGeometry(archWidth, vanState.archHeight, rearLength);
+            const archGeo = createWheelArchGeometry(archWidth, vanState.archHeight, rearLength);
             const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
 
             const leftArch = new THREE.Mesh(archGeo, archMat);
-            leftArch.position.set(-vanState.narrowWidth / 2 - archWidth / 2, vanState.archHeight / 2, zRearCenter);
+            leftArch.position.set(-vanState.narrowWidth / 2 - archWidth / 2, 0, zRearCenter);
             leftArch.receiveShadow = true; leftArch.castShadow = true;
             vanGroup.add(leftArch);
 
             const rightArch = new THREE.Mesh(archGeo, archMat);
-            rightArch.position.set(vanState.narrowWidth / 2 + archWidth / 2, vanState.archHeight / 2, zRearCenter);
+            rightArch.position.set(vanState.narrowWidth / 2 + archWidth / 2, 0, zRearCenter);
             rightArch.receiveShadow = true; rightArch.castShadow = true;
             vanGroup.add(rightArch);
         }
