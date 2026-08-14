@@ -16,8 +16,14 @@ const { checkCollision } = await import('./collision.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, DEFAULT_PRICE, isXrayEnabled, setXrayEnabled,
-    renameObject, isParked, parkObject, returnObjectToVan, isExplodedEnabled, setExplodedEnabled,
+    renameObject, isParked, parkObject, returnObjectToVan, isExplodedEnabled, setExplodedEnabled, stepExplodeAnimation,
 } = await import('./objects.js');
+
+// Fast-forwards every in-flight explode/implode tween to completion in one
+// step, regardless of the real animation duration/stagger — passing a
+// timestamp far past any delayMs a burst could have scheduled guarantees
+// every entry's `t` clamps to 1 on this single call.
+const FAR_FUTURE = () => performance.now() + 1e6;
 
 beforeEach(() => {
     Object.assign(vanState, {
@@ -819,12 +825,25 @@ describe('explode view', () => {
         expect(mesh.userData.explodeOffset).toBeUndefined();
     });
 
-    it('pushes every currently tracked object outward from the van origin, by the fixed explode distance', () => {
+    it('animates the push over time rather than snapping instantly', () => {
+        const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        mesh.position.set(0.5, 0.15, 1.0);
+        const before = mesh.position.clone();
+
+        setExplodedEnabled(true);
+        expect(mesh.position.equals(before)).toBe(true); // hasn't moved yet — no animation frame has run
+
+        stepExplodeAnimation(FAR_FUTURE());
+        expect(mesh.position.equals(before)).toBe(false);
+    });
+
+    it('pushes every currently tracked object outward from the van origin, by the fixed explode distance, once the animation lands', () => {
         const a = addBox(0.5, 0.3, 0.5, 0x64748b);
         a.position.set(0.5, 0.15, 1.0);
         const before = a.position.clone();
 
         setExplodedEnabled(true);
+        stepExplodeAnimation(FAR_FUTURE());
 
         expect(isExplodedEnabled()).toBe(true);
         expect(a.position.equals(before)).toBe(false);
@@ -837,7 +856,9 @@ describe('explode view', () => {
         const before = mesh.position.clone();
 
         setExplodedEnabled(true);
+        stepExplodeAnimation(FAR_FUTURE());
         setExplodedEnabled(false);
+        stepExplodeAnimation(FAR_FUTURE());
 
         expect(mesh.position.x).toBeCloseTo(before.x);
         expect(mesh.position.y).toBeCloseTo(before.y);
@@ -850,6 +871,7 @@ describe('explode view', () => {
         mesh.position.set(0, 0.1, 0); // exactly on the van's centerline, low to the floor
 
         setExplodedEnabled(true);
+        stepExplodeAnimation(FAR_FUTURE());
 
         expect(mesh.position.y).toBeGreaterThanOrEqual(0.1);
     });
@@ -857,6 +879,8 @@ describe('explode view', () => {
     it('applies the current explode state to objects created afterward', () => {
         setExplodedEnabled(true);
         const mesh = addBox(0.5, 0.3, 0.5, 0x64748b);
+        // The offset/target is committed synchronously at spawn time even
+        // though the visual animation is still deferred to the next frame.
         expect(mesh.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
     });
 
@@ -866,6 +890,7 @@ describe('explode view', () => {
         const parkedPos = mesh.position.clone();
 
         setExplodedEnabled(true);
+        stepExplodeAnimation(FAR_FUTURE());
 
         expect(mesh.position.equals(parkedPos)).toBe(true);
         expect(mesh.userData.explodeOffset).toBeUndefined();
@@ -898,13 +923,14 @@ describe('explode view', () => {
         expect(mesh.geometry.parameters).toMatchObject({ width: 0.5, height: 0.3, depth: 0.6 });
     });
 
-    it('duplicates near the original\'s true (non-exploded) position, exploding the copy too', () => {
+    it('duplicates near the original\'s true (non-exploded) position even mid-animation, exploding the copy too', () => {
         const mesh = addBox(0.4, 0.3, 0.4, 0x64748b);
         mesh.position.set(0.3, 0.15, -0.5);
-        setExplodedEnabled(true);
-        const truePos = mesh.position.clone().sub(mesh.userData.explodeOffset);
+        const truePos = mesh.position.clone();
+        setExplodedEnabled(true); // animation scheduled but not yet stepped — mesh.position is still truePos
 
         const copy = duplicateObject(mesh);
+        stepExplodeAnimation(FAR_FUTURE());
 
         expect(copy.userData.explodeOffset).toBeInstanceOf(THREE.Vector3);
         const copyTruePos = copy.position.clone().sub(copy.userData.explodeOffset);

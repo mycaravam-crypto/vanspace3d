@@ -26,7 +26,7 @@ const PARKED_EDGE_COLOR = 0xf59e0b; // amber — staged outside the van (see par
 // same as camera position) that makes every object's fill translucent so one
 // hidden behind/inside another is still visible without moving anything.
 // ==========================================
-const XRAY_OPACITY = 0.35;
+const XRAY_OPACITY = 0.15;
 let xrayEnabled = false;
 
 export function isXrayEnabled() {
@@ -42,6 +42,12 @@ function applyXray(mat) {
     // van.js — depthWrite:false while transparent avoids draw-order
     // artifacts between overlapping see-through boxes.
     mat.depthWrite = !xrayEnabled;
+    // Without this, WebGLRenderer keeps using the blend/depth state it
+    // compiled the material with the first time it was rendered opaque, so
+    // opacity/transparent/depthWrite silently stop having any visible
+    // effect on an already-rendered material — needsUpdate forces it to
+    // pick the new state back up.
+    mat.needsUpdate = true;
 }
 
 // Applies (or clears) x-ray translucency across every currently tracked
@@ -55,19 +61,21 @@ export function setXrayEnabled(enabled) {
 
 // ==========================================
 // EXPLODE VIEW — a global toggle (not per-object, not persisted/undo-tracked,
-// same as x-ray above) that pushes every non-parked object outward from the
-// van's own origin so tightly packed or stacked cargo can be told apart
-// without dragging anything. Unlike x-ray (a pure material property), this
-// moves obj.position itself: the exact vector that was added is stashed in
-// obj.userData.explodeOffset while active and subtracted back out
-// bit-for-bit on toggle off, so nothing needs to remember the "real"
-// position separately. Anything that would otherwise write a position
-// derived from the (currently displaced) obj.position — dragging (see
-// controls.js), keyboard nudging, resizing, rotating — is refused
-// (flashReject) while explode is active, the same way a locked object
-// refuses them, so the stashed offset always stays valid to undo.
+// same as x-ray above) that animates every non-parked object outward from
+// the van's own origin, as a staggered burst, so tightly packed or stacked
+// cargo can be told apart without dragging anything. Unlike x-ray (a pure
+// material property), this moves obj.position itself: the exact offset
+// vector is stashed in obj.userData.explodeOffset the instant the animation
+// is *scheduled* (not when it lands), and subtracted back out on toggle
+// off, so the stashed offset is always valid even mid-flight. Anything that
+// would otherwise write a position derived from the (currently displaced or
+// animating) obj.position — dragging (see controls.js), keyboard nudging,
+// resizing, rotating — is refused (flashReject) the whole time explode is
+// active, the same way a locked object refuses them.
 // ==========================================
 const EXPLODE_DISTANCE = 0.5; // meters each object is pushed outward from the van's origin
+const EXPLODE_ANIM_DURATION = 450; // ms for one object's push/return animation
+const EXPLODE_ANIM_STAGGER = 25; // ms of extra delay per object index, so a batch bursts outward instead of jumping in lockstep
 
 let explodedEnabled = false;
 
@@ -75,51 +83,106 @@ export function isExplodedEnabled() {
     return explodedEnabled;
 }
 
+// In-flight position tweens, one entry per object currently animating in or
+// out of the explode view. `base` is the object's true (non-exploded)
+// resting position, recorded once when the tween starts and never touched
+// again, so getBasePosition() below stays correct however far the
+// animation has progressed. `from`/`to` are the actual endpoints being
+// interpolated between, which only equal `base`/exploded-target on an
+// uninterrupted tween — see startPositionTween()'s `from` comment.
+const explodeAnimations = new Map();
+
+// Same curve the exploded-view reference this was modeled on uses for its
+// part-separation animation: overshoots slightly past the target before
+// settling, which reads as a little "pop" outward rather than a linear glide.
+function easeOutBack(t) {
+    const c1 = 1.70158;
+    const c3 = c1 + 1;
+    return 1 + c3 * (t - 1) ** 3 + c1 * (t - 1) ** 2;
+}
+
+function startPositionTween(obj, base, target, delayMs) {
+    explodeAnimations.set(obj, {
+        base: base.clone(),
+        from: obj.position.clone(), // wherever it visually is right now — lets re-toggling mid-animation reverse smoothly instead of jumping
+        to: target.clone(),
+        startAt: performance.now() + delayMs,
+    });
+}
+
+function cancelExplodeTween(obj) {
+    explodeAnimations.delete(obj);
+}
+
+// Advances every in-flight explode/implode tween by one frame. Called from
+// main.js's render loop, mirroring updateRotateHandle()/updateObjectLabels().
+// Accepts an explicit timestamp (defaulting to real time) purely so tests
+// can fast-forward deterministically instead of depending on wall-clock time.
+export function stepExplodeAnimation(now = performance.now()) {
+    explodeAnimations.forEach((anim, obj) => {
+        if (now < anim.startAt) return; // still waiting out its stagger delay
+        const t = Math.min(1, (now - anim.startAt) / EXPLODE_ANIM_DURATION);
+        obj.position.lerpVectors(anim.from, anim.to, easeOutBack(t));
+        if (t >= 1) explodeAnimations.delete(obj);
+    });
+}
+
+// obj's true resting position, whether it's currently exploded, parked, or
+// mid-animation — the single source of truth duplicateObject() and
+// implodeOne() below use instead of reading obj.position directly, which
+// mid-tween is neither the resting position nor the fully-exploded one.
+function getBasePosition(obj) {
+    const anim = explodeAnimations.get(obj);
+    if (anim) return anim.base.clone();
+    if (obj.userData.explodeOffset) return obj.position.clone().sub(obj.userData.explodeOffset);
+    return obj.position.clone();
+}
+
 // The van is centered left-right and front-back on X=0/Z=0 and sits on the
-// floor at Y=0 (see van.js), so an object's own position vector *is* its
-// direction away from the van's origin — no separate "center" point needed,
-// and critically it's never pointing downward (every placed object's Y is
-// positive), so exploding never pushes something down through the floor.
-// Falls back to straight up for the (rare) object sitting exactly on the
-// origin, so it still moves instead of staying put.
-function explodeDirection(obj) {
-    const dir = obj.position.clone();
+// floor at Y=0 (see van.js), so an object's own resting position vector *is*
+// its direction away from the van's origin — no separate "center" point
+// needed, and critically it's never pointing downward (every placed
+// object's Y is positive), so exploding never pushes something down through
+// the floor. Falls back to straight up for the (rare) object sitting
+// exactly on the origin, so it still moves instead of staying put.
+function explodeDirection(basePos) {
+    const dir = basePos.clone();
     return dir.lengthSq() < 1e-6 ? new THREE.Vector3(0, 1, 0) : dir.normalize();
 }
 
-// Applies the outward push to a single object, unless it's parked (already
-// staged outside the van — nothing to separate it from) or already exploded.
-function explodeOne(obj) {
+// Schedules the outward push for a single object, unless it's parked
+// (already staged outside the van — nothing to separate it from) or already
+// exploded. `delayMs` staggers a batch into a burst — see
+// setExplodedEnabled() below.
+function explodeOne(obj, delayMs = 0) {
     if (obj.userData.parked || obj.userData.explodeOffset) return;
-    obj.userData.explodeOffset = explodeDirection(obj).multiplyScalar(EXPLODE_DISTANCE);
-    obj.position.add(obj.userData.explodeOffset);
+    const base = getBasePosition(obj);
+    const offset = explodeDirection(base).multiplyScalar(EXPLODE_DISTANCE);
+    obj.userData.explodeOffset = offset;
+    startPositionTween(obj, base, base.clone().add(offset), delayMs);
 }
 
 // Reverses explodeOne() for a single object; no-op if it was never exploded.
-function implodeOne(obj) {
+function implodeOne(obj, delayMs = 0) {
     if (!obj.userData.explodeOffset) return;
-    obj.position.sub(obj.userData.explodeOffset);
+    const base = getBasePosition(obj);
     delete obj.userData.explodeOffset;
+    clampToVan(obj, base); // re-validate against the van's current bounds, in case they changed while exploded
+    startPositionTween(obj, base, base, delayMs);
 }
 
 // Applies (or clears) the outward push across every currently tracked
-// object, mirroring setXrayEnabled() above. New objects pick up the current
-// state automatically (see addBox()/duplicateObject()/returnObjectToVan()
-// below), so toggling this once covers everything already placed and
-// anything added/loaded/undone afterward. Turning it back off re-clamps
-// every restored position to the van's *current* bounds — harmless when
-// nothing changed, but it means resizing the van while exploded (the one
-// gap the interaction guards above don't cover) can't strand an object
-// outside the walls once the view returns to normal.
+// object, mirroring setXrayEnabled() above, as a staggered burst rather than
+// snapping instantly. New objects pick up the current state automatically
+// (see addBox()/duplicateObject()/returnObjectToVan() below), so toggling
+// this once covers everything already placed and anything added/loaded/
+// undone afterward.
 export function setExplodedEnabled(enabled) {
     explodedEnabled = enabled;
-    objects.forEach((obj) => {
-        if (enabled) {
-            explodeOne(obj);
-        } else {
-            implodeOne(obj);
-            clampToVan(obj, obj.position);
-        }
+    objects.forEach((obj, idx) => {
+        const delay = idx * EXPLODE_ANIM_STAGGER;
+        if (enabled) explodeOne(obj, delay);
+        else implodeOne(obj, delay);
     });
 }
 
@@ -157,6 +220,7 @@ function placeInFirstOpenSpot(mesh, w, h, d) {
 }
 
 function disposeAndDetach(obj) {
+    cancelExplodeTween(obj); // an object mid-animation getting removed shouldn't leave a stale tween writing to it every frame
     scene.remove(obj);
     obj.geometry.dispose();
     if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
@@ -300,7 +364,11 @@ export function parkObject(obj) {
     if (obj.userData.parked) return false;
 
     const { height: h } = obj.geometry.parameters;
-    delete obj.userData.explodeOffset; // parked objects sit outside the explode view entirely (see explodeOne() above), and get a fresh position below anyway
+    // Parked objects sit outside the explode view entirely (see explodeOne()
+    // above) and get a fresh position below anyway, so any in-flight tween
+    // or stashed offset is just discarded rather than resolved.
+    cancelExplodeTween(obj);
+    delete obj.userData.explodeOffset;
     obj.userData.parked = true;
     obj.position.copy(nextParkSlot(h));
     refreshObjectAppearance(obj);
@@ -366,13 +434,16 @@ export function duplicateObject(obj) {
     const label = obj.userData.label;
 
     // Duplicate near obj's true (non-exploded) position, not wherever it's
-    // currently displaced to for the explode view — see EXPLODE VIEW above.
-    const basePos = obj.userData.explodeOffset
-        ? obj.position.clone().sub(obj.userData.explodeOffset)
-        : obj.position;
+    // currently displaced/animating to for the explode view — see
+    // getBasePosition() in EXPLODE VIEW above.
+    const basePos = getBasePosition(obj);
 
     const copy = addBox(width, height, depth, color, weight, label, { price });
-    delete copy.userData.explodeOffset; // addBox() may have just exploded the spawn position above; the .set() below replaces it outright
+    // addBox() may have just scheduled an explode animation for the spawn
+    // position above; the .set() below replaces that position outright, so
+    // discard it rather than let it fight the fresh one scheduled below.
+    cancelExplodeTween(copy);
+    delete copy.userData.explodeOffset;
     copy.position.set(basePos.x + 0.1, basePos.y, basePos.z + 0.1);
     clampToVan(copy, copy.position);
     if (explodedEnabled) explodeOne(copy);
