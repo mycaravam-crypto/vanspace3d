@@ -3,6 +3,7 @@ import { buildVanGeometry } from './van.js';
 import {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
     rotateX90, flashReject, setXrayEnabled, setExplodedEnabled, renameObject, parkObject, returnObjectToVan,
+    parkAllObjects, restoreAllParkedObjects, isParkAllActive,
 } from './objects.js';
 import { STANDARD_LIBRARY } from './library.js';
 import { VEHICLE_PRESETS } from './vehicles.js';
@@ -506,6 +507,41 @@ function initObjectPanel() {
         clearUnlockedObjects(); // locked objects are protected from bulk removal too
         refreshHistoryButtons();
     });
+
+    initParkAllToggle();
+}
+
+// "Alle auslagern"/"Alle zurückholen" — bulk version of the per-object park
+// button in each object-list row, sitting just above "Alle entfernen". A
+// real mutation (positions + `parked` flags change), not a pure view
+// setting, so — unlike cam-xray/cam-explode — it goes through
+// captureUndoPoint() same as any other action. syncParkAllButton() re-reads
+// isParkAllActive() (objects.js) rather than tracking its own local flag, so
+// it's called from refreshHistoryButtons() too: an undo/redo that unwinds
+// past this toggle snaps the button back to the correct state automatically.
+function syncParkAllButton() {
+    const btn = document.getElementById('park-all-toggle');
+    if (!btn) return;
+    const active = isParkAllActive();
+    const label = document.getElementById('park-all-label');
+    btn.setAttribute('aria-pressed', String(active));
+    btn.classList.toggle('bg-amber-500/20', active);
+    btn.classList.toggle('border-amber-500/30', active);
+    if (label) label.textContent = active ? 'Alle zurückholen' : 'Alle auslagern';
+    btn.title = active
+        ? 'Alle ausgelagerten Objekte zurück in den Laderaum holen'
+        : 'Alle Objekte vorübergehend auslagern (in den Parkbereich neben dem Fahrzeug)';
+}
+
+function initParkAllToggle() {
+    const btn = document.getElementById('park-all-toggle');
+    if (!btn) return;
+    btn.addEventListener('click', () => {
+        captureUndoPoint();
+        if (isParkAllActive()) restoreAllParkedObjects(); else parkAllObjects();
+        refreshHistoryButtons();
+    });
+    syncParkAllButton();
 }
 
 // ==========================================
@@ -815,6 +851,7 @@ export function refreshHistoryButtons() {
     if (undoBtn) undoBtn.disabled = !canUndo();
     if (redoBtn) redoBtn.disabled = !canRedo();
     renderObjectList();
+    syncParkAllButton();
 }
 
 function initHistoryButtons() {

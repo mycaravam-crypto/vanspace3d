@@ -17,6 +17,7 @@ const {
     addBox, clearAllObjects, clearUnlockedObjects, rotate90, rotateX90, resizeObject, removeObject, duplicateObject,
     toggleLock, moveVertical, moveHorizontal, flashReject, DEFAULT_WEIGHT, DEFAULT_PRICE, isXrayEnabled, setXrayEnabled,
     renameObject, isParked, parkObject, returnObjectToVan, isExplodedEnabled, setExplodedEnabled, stepExplodeAnimation,
+    parkAllObjects, restoreAllParkedObjects, isParkAllActive,
 } = await import('./objects.js');
 
 // Fast-forwards every in-flight explode/implode tween to completion in one
@@ -29,6 +30,10 @@ beforeEach(() => {
     Object.assign(vanState, {
         length: 3.3, frontLength: 1.6, maxHeight: 1.9, maxWidth: 1.8, narrowWidth: 1.3, archHeight: 0.45,
     });
+    // parkAllObjects()'s bookkeeping is module-level state, outliving any one
+    // test's `objects` array reset below — clear it first so a test that left
+    // the toggle active doesn't leak into the next one.
+    if (isParkAllActive()) restoreAllParkedObjects();
     objects.length = 0;
     scene.add.mockClear();
     scene.remove.mockClear();
@@ -1068,6 +1073,80 @@ describe('parkObject / returnObjectToVan', () => {
         expect(returnObjectToVan(mesh)).toBe(false);
         expect(isParked(mesh)).toBe(true);
         expect(mesh.material.emissive.getHex()).toBe(0xff0000);
+    });
+});
+
+describe('parkAllObjects / restoreAllParkedObjects', () => {
+    it('is inactive by default', () => {
+        expect(isParkAllActive()).toBe(false);
+    });
+
+    it('parks every movable object and flips the toggle on', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.5, 0.5, 0.5, 0x64748b);
+
+        expect(parkAllObjects()).toBe(true);
+        expect(isParkAllActive()).toBe(true);
+        expect(isParked(a)).toBe(true);
+        expect(isParked(b)).toBe(true);
+    });
+
+    it('leaves fixed and locked objects untouched', () => {
+        const fixture = addBox(0.6, 0.32, 0.4, 0x64748b, DEFAULT_WEIGHT, null, { fixed: true });
+        const locked = addBox(0.5, 0.5, 0.5, 0x64748b);
+        toggleLock(locked);
+
+        parkAllObjects();
+
+        expect(isParked(fixture)).toBe(false);
+        expect(isParked(locked)).toBe(false);
+    });
+
+    it('is a no-op while already active', () => {
+        addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkAllObjects();
+        expect(parkAllObjects()).toBe(false);
+    });
+
+    it('restores every object it parked to its original position and flips the toggle off', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        const b = addBox(0.5, 0.5, 0.5, 0x64748b);
+        const posA = a.position.clone();
+        const posB = b.position.clone();
+
+        parkAllObjects();
+        expect(restoreAllParkedObjects()).toBe(true);
+
+        expect(isParkAllActive()).toBe(false);
+        expect(isParked(a)).toBe(false);
+        expect(isParked(b)).toBe(false);
+        expect(a.position.equals(posA)).toBe(true);
+        expect(b.position.equals(posB)).toBe(true);
+    });
+
+    it('skips an object that was already parked before the toggle ran', () => {
+        const preParked = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkObject(preParked);
+        const parkedSlot = preParked.position.clone();
+
+        parkAllObjects(); // preParked is already parked, so it's not in the bookkeeping map
+        restoreAllParkedObjects();
+
+        expect(isParked(preParked)).toBe(true); // untouched by the bulk restore
+        expect(preParked.position.equals(parkedSlot)).toBe(true);
+    });
+
+    it('skips an object returned individually while the toggle was active', () => {
+        const a = addBox(0.6, 0.32, 0.4, 0x64748b);
+        parkAllObjects();
+        returnObjectToVan(a); // user manually un-parks it before the bulk restore
+
+        expect(restoreAllParkedObjects()).toBe(true);
+        expect(isParked(a)).toBe(false); // still unparked, not re-parked by the restore
+    });
+
+    it('is a no-op (returns false) while inactive', () => {
+        expect(restoreAllParkedObjects()).toBe(false);
     });
 });
 
