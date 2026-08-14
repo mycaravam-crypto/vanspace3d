@@ -12,6 +12,9 @@ const SLIDER_RANGES = {
     maxWidth: [1.4, 2.4],
     narrowWidth: [0.8, 1.6],
     archHeight: [0.1, 0.8],
+    wheelWidth: [0.0, 0.6],
+    wheelHeight: [0.0, 0.8],
+    wheelLength: [0.1, 2.0],
     maxPayload: [50, 2000],
 };
 

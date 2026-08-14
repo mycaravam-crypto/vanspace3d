@@ -152,6 +152,9 @@ function mountFixture() {
         <input type="range" id="van-width-max" max="1000" value="180">
         <input type="range" id="van-width-min" max="1000" value="130">
         <input type="range" id="van-arch-h" max="1000" value="45">
+        <input type="range" id="van-wheel-w" max="1000" value="25">
+        <input type="range" id="van-wheel-h" max="1000" value="45">
+        <input type="range" id="van-wheel-l" max="1000" value="99">
         <input type="range" id="van-payload" min="50" max="2000" value="400">
         <span id="val-len"></span>
         <span id="val-front-len"></span>
@@ -160,6 +163,9 @@ function mountFixture() {
         <span id="val-width-max"></span>
         <span id="val-width-min"></span>
         <span id="val-arch-h"></span>
+        <span id="val-wheel-w"></span>
+        <span id="val-wheel-h"></span>
+        <span id="val-wheel-l"></span>
 
         <button id="undo-btn"></button>
         <button id="redo-btn"></button>

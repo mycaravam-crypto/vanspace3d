@@ -11,6 +11,7 @@ const { vanGroup, buildVanGeometry } = await import('./van.js');
 beforeEach(() => {
     Object.assign(vanState, {
         length: 3.3, frontLength: 1.6, maxHeight: 1.9, maxWidth: 1.8, narrowWidth: 1.3, archHeight: 0.45,
+        wheelWidth: 0.25, wheelHeight: 0.45, wheelLength: 0.99,
     });
     objects.length = 0;
 });
@@ -36,11 +37,18 @@ describe('buildVanGeometry', () => {
         expect(vanGroup.children).toHaveLength(2);
     });
 
-    it('omits the wheel arches when narrowWidth equals maxWidth', () => {
-        vanState.narrowWidth = vanState.maxWidth;
+    it('omits the wheel arches when wheelWidth is 0', () => {
+        vanState.wheelWidth = 0;
         buildVanGeometry();
         // frontBox + frontFloor + rearLower + upperZone + rearFloor, no arches
         expect(vanGroup.children).toHaveLength(5);
+    });
+
+    it('still draws the narrow-zone indicator even when wheelWidth is 0 — the two are independent', () => {
+        vanState.wheelWidth = 0;
+        buildVanGeometry();
+        const rearLower = vanGroup.children[2];
+        expect(rearLower.geometry.parameters.width).toBeCloseTo(vanState.narrowWidth);
     });
 
     it('disposes previous geometry/material instead of leaking on rebuild', () => {
@@ -68,8 +76,8 @@ describe('buildVanGeometry', () => {
         expect(vanGroup.children).toHaveLength(2);
     });
 
-    it('omits the wheel arches when narrowWidth is within 0.01 of maxWidth', () => {
-        vanState.narrowWidth = vanState.maxWidth - 0.019; // archWidth = 0.0095, below the guard
+    it('omits the wheel arches when wheelWidth is within 0.01 of 0', () => {
+        vanState.wheelWidth = 0.0095; // below the guard
         buildVanGeometry();
         expect(vanGroup.children).toHaveLength(5); // no arches
     });
@@ -110,6 +118,33 @@ describe('buildVanGeometry', () => {
         buildVanGeometry();
         const upperZone = vanGroup.children[3];
         expect(upperZone.geometry.parameters.depth).toBeCloseTo(vanState.length);
+    });
+
+    it('sizes and positions the wheel arch dome from wheelWidth/wheelHeight/wheelLength, independent of narrowWidth/archHeight', () => {
+        Object.assign(vanState, {
+            narrowWidth: 1.3, archHeight: 0.45, wheelWidth: 0.1, wheelHeight: 0.2, wheelLength: 0.5,
+        });
+        buildVanGeometry();
+        // Order of insertion: frontBox, frontFloor, rearLower, upperZone, rearFloor, leftArch, rightArch
+        const rightArch = vanGroup.children[6];
+        rightArch.geometry.computeBoundingBox();
+        const { min, max } = rightArch.geometry.boundingBox;
+
+        expect(max.x - min.x).toBeCloseTo(vanState.wheelWidth);
+        expect(max.y - min.y).toBeCloseTo(vanState.wheelHeight);
+        expect(max.z - min.z).toBeCloseTo(vanState.wheelLength);
+        expect(rightArch.position.x + max.x).toBeCloseTo(vanState.maxWidth / 2);
+        expect(rightArch.position.y + min.y).toBeCloseTo(0); // sits on the floor
+    });
+
+    it('caps the wheel arch length to the rear section on a short van', () => {
+        vanState.frontLength = vanState.length - 0.3; // rearLength = 0.3, shorter than wheelLength
+        vanState.wheelLength = 0.99;
+        buildVanGeometry();
+        const rightArch = vanGroup.children[6];
+        rightArch.geometry.computeBoundingBox();
+        const { min, max } = rightArch.geometry.boundingBox;
+        expect(max.z - min.z).toBeCloseTo(0.3);
     });
 
     it('re-clamps existing placed objects into the rebuilt van bounds', () => {

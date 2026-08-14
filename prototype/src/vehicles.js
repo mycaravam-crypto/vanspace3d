@@ -16,6 +16,9 @@ export const VEHICLE_PRESETS = [
         maxWidth: 1.7,
         narrowWidth: 1.22,
         archHeight: 0.35,
+        wheelWidth: 0.24,
+        wheelHeight: 0.35,
+        wheelLength: 0.77,
         maxPayload: 650,
     },
     {
@@ -27,6 +30,9 @@ export const VEHICLE_PRESETS = [
         maxWidth: 1.7,
         narrowWidth: 1.24,
         archHeight: 0.35,
+        wheelWidth: 0.23,
+        wheelHeight: 0.35,
+        wheelLength: 0.77,
         maxPayload: 1000,
     },
     {
@@ -38,6 +44,9 @@ export const VEHICLE_PRESETS = [
         maxWidth: 1.87,
         narrowWidth: 1.42,
         archHeight: 0.4,
+        wheelWidth: 0.225,
+        wheelHeight: 0.4,
+        wheelLength: 0.88,
         maxPayload: 1200,
     },
     {
@@ -49,6 +58,9 @@ export const VEHICLE_PRESETS = [
         maxWidth: 1.79,
         narrowWidth: 1.35,
         archHeight: 0.45,
+        wheelWidth: 0.22,
+        wheelHeight: 0.45,
+        wheelLength: 0.99,
         maxPayload: 1350,
     },
 ];

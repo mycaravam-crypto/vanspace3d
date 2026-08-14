@@ -12,6 +12,7 @@ function makeBox(w, h, d) {
 beforeEach(() => {
     Object.assign(vanState, {
         length: 3.3, frontLength: 1.6, maxHeight: 1.9, maxWidth: 1.8, narrowWidth: 1.3, archHeight: 0.45,
+        wheelWidth: 0.25, wheelHeight: 0.45, wheelLength: 0.99,
     });
     objects.length = 0;
 });
@@ -46,40 +47,53 @@ describe('clampToVan', () => {
         expect(pos.z).toBeCloseTo(vanState.length / 2 - 0.4 / 2);
     });
 
-    it('restricts x to the narrow width when low in the rear (wheel-arch) section', () => {
-        const box = makeBox(0.5, 0.2, 0.4); // narrow enough to fit (0.5 < narrowWidth 1.3)
-        // Rear section starts at -length/2 + frontLength = -1.65 + 1.6 = -0.05
-        const pos = new THREE.Vector3(10, 0.1, 0.5); // low object, deep in the rear
+    // zRearCenter = -length/2 + frontLength + rearLength/2 = -1.65 + 1.6 + 0.85 = 0.8;
+    // with the default wheelLength (0.99) the arch's own z-range is
+    // [0.305, 1.295] — narrower than the whole rear section (which runs from
+    // -0.05 to 1.65), unlike the old narrowWidth-based rule.
+    it('restricts x to the available width (maxWidth - 2*wheelWidth) when low and within the wheel arch\'s own z-range', () => {
+        const box = makeBox(0.5, 0.2, 0.4); // narrow enough to fit beside the arches
+        const pos = new THREE.Vector3(10, 0.1, 0.8); // low, centered on the arch
         clampToVan(box, pos);
-        expect(pos.x).toBeCloseTo(vanState.narrowWidth / 2 - 0.5 / 2);
+        const availableWidth = vanState.maxWidth - 2 * vanState.wheelWidth;
+        expect(pos.x).toBeCloseTo(availableWidth / 2 - 0.5 / 2);
     });
 
-    it('pushes an object too wide for the narrow section up above the arch height', () => {
-        // Wider than narrowWidth (1.3) so it cannot sit in the low rear section.
+    it('pushes an object too wide for the arch up above wheelHeight', () => {
+        // Wider than (maxWidth - 2*wheelWidth) = 1.3, so it cannot sit beside the arches.
         const box = makeBox(1.6, 0.2, 0.4);
-        const pos = new THREE.Vector3(0, 0.1, 0.5); // low, in the rear
+        const pos = new THREE.Vector3(0, 0.1, 0.8); // low, centered on the arch
         clampToVan(box, pos);
-        expect(pos.y).toBeGreaterThanOrEqual(vanState.archHeight + 0.2 / 2 - 1e-9);
+        expect(pos.y).toBeGreaterThanOrEqual(vanState.wheelHeight + 0.2 / 2 - 1e-9);
         // Once pushed up, it's allowed to use the full width again.
         expect(pos.x).toBeCloseTo(0);
     });
 
-    it('allows full width for an object high above the arch in the rear', () => {
+    it('allows full width for an object high above the arch', () => {
         const box = makeBox(1.6, 0.2, 0.4);
-        const pos = new THREE.Vector3(10, 1.0, 0.5); // above archHeight already
+        const pos = new THREE.Vector3(10, 1.0, 0.8); // above wheelHeight already, still centered on the arch in z
         clampToVan(box, pos);
         expect(pos.x).toBeCloseTo(vanState.maxWidth / 2 - 1.6 / 2);
     });
 
-    it('still applies full-width rules right at the front/rear split line', () => {
-        // zSplitLine = -length/2 + frontLength = -1.65 + 1.6 = -0.05.
-        // objRear must exceed zSplitLine + 0.01 to count as "in the rear" —
-        // an object whose back face sits exactly on the line stays full-width.
-        const box = makeBox(1.6, 0.2, 0.4); // too wide for the narrow rear section
-        const pos = new THREE.Vector3(10, 0.1, -0.25); // objRear = -0.25 + 0.2 = -0.05
+    it('allows full width for a low object in the rear section but outside the wheel arch\'s own z-range', () => {
+        // z=0 is inside the rear section (which starts at -0.05) but well
+        // short of the arch's own z-range (which only starts at 0.305) — the
+        // arches are now a localized obstacle, not a blanket narrowing of the
+        // whole rear floor the way the old narrowWidth rule worked.
+        const box = makeBox(1.6, 0.2, 0.4); // would have been "too wide" under the old rule
+        const pos = new THREE.Vector3(10, 0.1, 0);
         clampToVan(box, pos);
         expect(pos.x).toBeCloseTo(vanState.maxWidth / 2 - 1.6 / 2);
-        expect(pos.y).toBeCloseTo(0.1); // not pushed up, front-zone height rules apply
+        expect(pos.y).toBeCloseTo(0.1); // not pushed up either — nothing to avoid here
+    });
+
+    it('applies full-width rules just short of the wheel arch\'s own z-range (not the old front/rear split line)', () => {
+        const box = makeBox(0.5, 0.2, 0.4);
+        // objZMax = 0.3 + 0.2 = 0.3, just short of archZMin (0.305 - 0.01 tolerance = 0.295)
+        const pos = new THREE.Vector3(10, 0.1, 0.1);
+        clampToVan(box, pos);
+        expect(pos.x).toBeCloseTo(vanState.maxWidth / 2 - 0.5 / 2);
     });
 
     it('keeps an object taller than the van pinned to floor height (degenerate case)', () => {

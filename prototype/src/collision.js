@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { vanState, objects } from './state.js';
+import { getWheelArchBounds } from './wheelArch.js';
 
 // ==========================================
 // PHYSICS & COLLISION SYSTEM
@@ -17,20 +18,28 @@ export function clampToVan(obj, pos) {
     const h = obj.geometry.parameters.height;
     const d = obj.geometry.parameters.depth;
 
-    const zSplitLine = -(vanState.length / 2) + vanState.frontLength;
     const objBottom = pos.y - (h / 2);
-    const objRear = pos.z + (d / 2); // Z grows backwards
+    const objZMin = pos.z - (d / 2);
+    const objZMax = pos.z + (d / 2);
 
+    // Narrow the object's usable width only where it actually overlaps a
+    // wheel arch's own footprint — getWheelArchBounds() (wheelArch.js), the
+    // same bounds the 3D dome mesh is built from (van.js) — both in Z and in
+    // height. Unlike the old narrowWidth-driven rule, an object elsewhere in
+    // the rear section, or already above the arch, gets the van's full
+    // width: the arches are real (if configurable) obstacles now, not a
+    // blanket narrowing of the whole rear floor.
     let activeWidth = vanState.maxWidth;
+    for (const arch of getWheelArchBounds()) {
+        const overlapsZ = objZMax > arch.zMin + 0.01 && objZMin < arch.zMax - 0.01;
+        if (!overlapsZ || objBottom >= arch.yMax - 0.01) continue;
 
-    // Constraint: Object is in rear section and below arch height
-    if (objRear > zSplitLine + 0.01 && objBottom < vanState.archHeight - 0.01) {
-        activeWidth = vanState.narrowWidth;
-
-        // If it's physically too wide for the narrow section, force it UP
-        if (w > vanState.narrowWidth + 0.02) {
-            pos.y = Math.max(vanState.archHeight + h / 2, pos.y);
-            activeWidth = vanState.maxWidth;
+        const availableWidth = vanState.maxWidth - 2 * (arch.xMax - arch.xMin);
+        if (w > availableWidth + 0.02) {
+            // Too wide to fit beside the arch at floor level — lift it clear instead.
+            pos.y = Math.max(arch.yMax + h / 2, pos.y);
+        } else {
+            activeWidth = Math.min(activeWidth, availableWidth);
         }
     }
 

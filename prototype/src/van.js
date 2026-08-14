@@ -3,6 +3,7 @@ import { scene } from './scene.js';
 import { vanState, objects } from './state.js';
 import { clampToVan } from './collision.js';
 import { refreshCenterOfGravity } from './cog.js';
+import { getWheelArchBounds } from './wheelArch.js';
 
 // ==========================================
 // VAN CONFIGURATION & GEOMETRY
@@ -34,11 +35,9 @@ function disposeGroup(group) {
 // circular/elliptical base) sits on the floor at local y=0 and is left
 // uncapped, same reasoning as every other zone mesh here: it's flush against
 // the hidden floor, so there's nothing to see there anyway.
-// `width`/`height` are the same archWidth/archHeight the old box used, so the
-// dome keeps reshaping with the narrowWidth/archHeight sliders exactly like
-// before. `length` has no equivalent slider — it's derived from `height`
-// (roughly the tire's own diameter, the realistic footprint of a wheel
-// housing) rather than stretched across the whole rear floor.
+// `width`/`height`/`length` come from getWheelArchBounds() (wheelArch.js),
+// i.e. the wheelWidth/wheelHeight/wheelLength sliders — independent of the
+// narrowWidth/archHeight "narrow zone" indicator drawn elsewhere in this file.
 function createWheelArchGeometry(width, height, length) {
     const geo = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
     geo.scale(width / 2, height, length / 2);
@@ -117,31 +116,21 @@ export function buildVanGeometry() {
         vanGroup.add(rearFloor);
 
         // Wheel arch solid representation — a rounded dome (see
-        // createWheelArchGeometry() above) sized like a real wheel housing,
-        // centered in the rear section rather than stretched across its
-        // whole depth. The *collision* footprint (clampToVan() in
-        // collision.js) still narrows the entire rear section to narrowWidth
-        // regardless of the dome's length — this only changes what's drawn,
-        // not what's off-limits, so the reported cargo area is unchanged.
-        const archWidth = Math.max(0, (vanState.maxWidth - vanState.narrowWidth) / 2);
-        if (archWidth > 0.01) {
-            // Roughly the tire's own diameter — about as long as the arch is
-            // tall — capped to the rear section so it never overflows a
-            // short van.
-            const archLength = Math.min(rearLength, vanState.archHeight * 2.2);
-            const archGeo = createWheelArchGeometry(archWidth, vanState.archHeight, archLength);
-            const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
-
-            const leftArch = new THREE.Mesh(archGeo, archMat);
-            leftArch.position.set(-vanState.narrowWidth / 2 - archWidth / 2, 0, zRearCenter);
-            leftArch.receiveShadow = true; leftArch.castShadow = true;
-            vanGroup.add(leftArch);
-
-            const rightArch = new THREE.Mesh(archGeo, archMat);
-            rightArch.position.set(vanState.narrowWidth / 2 + archWidth / 2, 0, zRearCenter);
-            rightArch.receiveShadow = true; rightArch.castShadow = true;
-            vanGroup.add(rightArch);
-        }
+        // createWheelArchGeometry() above) sized and positioned from
+        // getWheelArchBounds() (wheelArch.js), the SAME bounds
+        // clampToVan() (collision.js) treats as off-limits, so the drawn
+        // shape and the actual cargo restriction always agree. This is
+        // independent of narrowWidth/archHeight — the rearLower zone above
+        // remains the "narrow zone" indicator regardless of the arches'
+        // real size.
+        const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
+        getWheelArchBounds().forEach((arch) => {
+            const archGeo = createWheelArchGeometry(arch.xMax - arch.xMin, arch.yMax - arch.yMin, arch.zMax - arch.zMin);
+            const archMesh = new THREE.Mesh(archGeo, archMat);
+            archMesh.position.set((arch.xMin + arch.xMax) / 2, arch.yMin, (arch.zMin + arch.zMax) / 2);
+            archMesh.receiveShadow = true; archMesh.castShadow = true;
+            vanGroup.add(archMesh);
+        });
     }
 
     // Re-validate object positions when van changes
