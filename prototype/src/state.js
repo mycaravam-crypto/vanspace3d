@@ -12,6 +12,13 @@ export const DEFAULT_VAN_STATE = Object.freeze({
     maxWidth: 1.8,
     narrowWidth: 1.3,
     archHeight: 0.45,
+    // The actual wheel arch (Radkasten) dimensions — independent of
+    // narrowWidth/archHeight above, which now only draw the "narrow zone"
+    // area indicator (see wheelArch.js). These drive both the 3D dome mesh
+    // and what clampToVan() (collision.js) actually treats as off-limits.
+    wheelWidth: 0.25,
+    wheelHeight: 0.45,
+    wheelLength: 0.99,
     // Illustrative default max payload (kg) — not a real vehicle spec, just a
     // starting point the user is meant to adjust for their actual vehicle.
     maxPayload: 400,

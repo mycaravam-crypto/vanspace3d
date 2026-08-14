@@ -170,6 +170,9 @@ function updateLabels() {
     document.getElementById('val-width-max').textContent = Math.round(vanState.maxWidth * CM_PER_M);
     document.getElementById('val-width-min').textContent = Math.round(vanState.narrowWidth * CM_PER_M);
     document.getElementById('val-arch-h').textContent = Math.round(vanState.archHeight * CM_PER_M);
+    document.getElementById('val-wheel-w').textContent = Math.round(vanState.wheelWidth * CM_PER_M);
+    document.getElementById('val-wheel-h').textContent = Math.round(vanState.wheelHeight * CM_PER_M);
+    document.getElementById('val-wheel-l').textContent = Math.round(vanState.wheelLength * CM_PER_M);
     document.getElementById('val-payload').textContent = vanState.maxPayload.toFixed(0);
 }
 
@@ -189,6 +192,14 @@ function updateConfigFromUI() {
     const rawArchH = parseFloat(document.getElementById('van-arch-h').value) / CM_PER_M;
     vanState.archHeight = Math.min(rawArchH, vanState.maxHeight - 0.1);
 
+    // Actual wheel arch (Radkasten) size — independent of narrowWidth/
+    // archHeight above, which only draw the "narrow zone" area indicator;
+    // see wheelArch.js. Width is capped so the two arches can never overlap
+    // (or exceed) the van's own width.
+    vanState.wheelWidth = Math.min(parseFloat(document.getElementById('van-wheel-w').value) / CM_PER_M, vanState.maxWidth / 2);
+    vanState.wheelHeight = Math.min(parseFloat(document.getElementById('van-wheel-h').value) / CM_PER_M, vanState.maxHeight - 0.1);
+    vanState.wheelLength = parseFloat(document.getElementById('van-wheel-l').value) / CM_PER_M;
+
     vanState.maxPayload = parseFloat(document.getElementById('van-payload').value);
 
     updateLabels();
@@ -196,7 +207,8 @@ function updateConfigFromUI() {
 }
 
 const CONFIG_SLIDER_IDS = [
-    'van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h', 'van-payload',
+    'van-len', 'van-front-len', 'van-height', 'van-width-max', 'van-width-min', 'van-arch-h',
+    'van-wheel-w', 'van-wheel-h', 'van-wheel-l', 'van-payload',
 ];
 
 // Renders one button per VEHICLE_PRESETS entry; clicking one overwrites the
@@ -233,6 +245,9 @@ function initVehiclePresets() {
                 maxWidth: preset.maxWidth,
                 narrowWidth: preset.narrowWidth,
                 archHeight: preset.archHeight,
+                wheelWidth: preset.wheelWidth,
+                wheelHeight: preset.wheelHeight,
+                wheelLength: preset.wheelLength,
                 maxPayload: preset.maxPayload,
             });
             syncSlidersFromState();
@@ -267,6 +282,9 @@ export function syncSlidersFromState() {
     document.getElementById('van-width-max').value = Math.round(vanState.maxWidth * CM_PER_M);
     document.getElementById('van-width-min').value = Math.round(vanState.narrowWidth * CM_PER_M);
     document.getElementById('van-arch-h').value = Math.round(vanState.archHeight * CM_PER_M);
+    document.getElementById('van-wheel-w').value = Math.round(vanState.wheelWidth * CM_PER_M);
+    document.getElementById('van-wheel-h').value = Math.round(vanState.wheelHeight * CM_PER_M);
+    document.getElementById('van-wheel-l').value = Math.round(vanState.wheelLength * CM_PER_M);
     document.getElementById('van-payload').value = vanState.maxPayload;
     updateLabels();
 }

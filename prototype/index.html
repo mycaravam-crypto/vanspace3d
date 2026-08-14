@@ -287,6 +287,34 @@
                     </label>
                     <input type="range" id="van-arch-h" min="10" max="80" step="5" value="45" class="w-full accent-emerald-500">
                 </div>
+                <p class="text-[9px] text-slate-500">Nur eine grobe Anzeige des verengten Bereichs. Die tats&auml;chliche Form &amp; Kollision richten sich nach der Radkasten-Gr&ouml;&szlig;e unten.</p>
+            </div>
+
+            <!-- Actual wheel arch (Radkasten) size — drives the 3D dome mesh
+                 AND what clampToVan() (collision.js) treats as off-limits,
+                 independently of the narrow-zone indicator above; see
+                 wheelArch.js. -->
+            <div class="pt-3 border-t border-white/10 space-y-3">
+                <h2 class="text-[10px] uppercase tracking-wider font-bold text-slate-500">Radkasten-Gr&ouml;&szlig;e (3D &amp; Kollision)</h2>
+                <div>
+                    <label for="van-wheel-w" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        Breite <span class="font-normal text-slate-400 font-mono"><span id="val-wheel-w">25</span>cm</span>
+                    </label>
+                    <input type="range" id="van-wheel-w" min="0" max="60" step="1" value="25" class="w-full accent-amber-500">
+                </div>
+                <div>
+                    <label for="van-wheel-h" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        H&ouml;he <span class="font-normal text-slate-400 font-mono"><span id="val-wheel-h">45</span>cm</span>
+                    </label>
+                    <input type="range" id="van-wheel-h" min="0" max="80" step="1" value="45" class="w-full accent-amber-500">
+                </div>
+                <div>
+                    <label for="van-wheel-l" class="flex justify-between text-xs font-semibold text-slate-300 mb-1">
+                        L&auml;nge <span class="font-normal text-slate-400 font-mono"><span id="val-wheel-l">99</span>cm</span>
+                    </label>
+                    <input type="range" id="van-wheel-l" min="10" max="200" step="1" value="99" class="w-full accent-amber-500">
+                </div>
+                <p class="text-[9px] text-slate-500">Tats&auml;chliche Radkasten-Form: bestimmt die 3D-Kuppel und wo Objekte tats&auml;chlich nicht platziert werden k&ouml;nnen.</p>
             </div>
 
             <!-- Payload limit -->

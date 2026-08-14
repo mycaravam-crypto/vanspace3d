@@ -10,6 +10,9 @@ describe('initial state', () => {
             maxWidth: 1.8,
             narrowWidth: 1.3,
             archHeight: 0.45,
+            wheelWidth: 0.25,
+            wheelHeight: 0.45,
+            wheelLength: 0.99,
             maxPayload: 400,
         });
     });
