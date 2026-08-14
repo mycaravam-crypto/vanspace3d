@@ -6,7 +6,7 @@ import { vanState, objects } from './state.js';
 import { clampToVan, checkCollision, findFaceSnap } from './collision.js';
 import {
     rotate90, rotateX90, removeObject, duplicateObject, toggleLock, moveVertical, moveHorizontal, flashReject,
-    setObjectColor,
+    setObjectColor, isExplodedEnabled,
 } from './objects.js';
 import {
     isSelected, getSelected, selectOnly, toggleInSelection, addManyToSelection, clearSelection,
@@ -76,7 +76,11 @@ dragControls.addEventListener('dragstart', (event) => {
     // a locked object straight back every tick, effectively making it immovable.
     lastValidPos.copy(event.object.position);
 
-    if (event.object.userData.locked) {
+    // The explode view displaces obj.position by a stashed offset (see
+    // objects.js) that toggling explode back off subtracts out again —
+    // dragging from that displaced position would bake the offset into the
+    // object's real position, so it's refused the same way a locked object is.
+    if (event.object.userData.locked || isExplodedEnabled()) {
         flashReject(event.object);
         return; // orbitControls stays enabled, so camera orbit still works normally
     }
@@ -118,7 +122,7 @@ dragControls.addEventListener('dragend', (event) => {
         return;
     }
 
-    if (!isValidTarget(event.object) || event.object.userData.locked) return;
+    if (!isValidTarget(event.object) || event.object.userData.locked || isExplodedEnabled()) return;
     snapToFloor(event.object); // Final floor snap check
 });
 
@@ -169,7 +173,7 @@ dragControls.addEventListener('drag', (event) => {
     const obj = event.object;
     if (!isValidTarget(obj)) return;
 
-    if (obj.userData.locked) {
+    if (obj.userData.locked || isExplodedEnabled()) {
         obj.position.copy(lastValidPos); // undo DragControls' own direct mutation this tick
         return;
     }

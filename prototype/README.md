@@ -35,6 +35,10 @@ Vanilla JavaScript + [Three.js](https://threejs.org/) + [Vite](https://vitejs.de
 
 **Responsive layout** — on viewports below the `md` breakpoint (768px), the side panel becomes a full-width bottom sheet that starts collapsed so the 3D view stays visible, and expands/collapses via the ▲/▼ button next to the header. Touch-drag for object placement works via the same pointer-event-based `DragControls` used for mouse (it also disables touch scrolling on the canvas so a drag doesn't fight the page).
 
+**Camera & view toolbar** — Top/Front/Side presets and a reset-to-isometric button, plus two independent, persistent view toggles next to them:
+- **Röntgen (X-ray)** — makes every object's fill translucent (edges stay crisp) so one hidden behind or inside another is still visible without moving anything.
+- **Explosion (explode)** — pushes every non-parked object outward from the van's origin so tightly packed or stacked cargo can be told apart at a glance. Dragging, resizing, and rotating are refused while it's active (the object flashes red, the same feedback a locked object gives) since they'd otherwise act on the temporarily displaced position; turning it back off restores every object's exact original position.
+
 ## Keyboard shortcuts
 
 Object shortcuts act on whichever object the mouse is currently hovering — except `R` and `Delete`/`Backspace`, which act on the whole multi-selection instead whenever more than one object is selected (see Multi-select above).

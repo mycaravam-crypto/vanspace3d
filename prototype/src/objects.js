@@ -54,6 +54,76 @@ export function setXrayEnabled(enabled) {
 }
 
 // ==========================================
+// EXPLODE VIEW — a global toggle (not per-object, not persisted/undo-tracked,
+// same as x-ray above) that pushes every non-parked object outward from the
+// van's own origin so tightly packed or stacked cargo can be told apart
+// without dragging anything. Unlike x-ray (a pure material property), this
+// moves obj.position itself: the exact vector that was added is stashed in
+// obj.userData.explodeOffset while active and subtracted back out
+// bit-for-bit on toggle off, so nothing needs to remember the "real"
+// position separately. Anything that would otherwise write a position
+// derived from the (currently displaced) obj.position — dragging (see
+// controls.js), keyboard nudging, resizing, rotating — is refused
+// (flashReject) while explode is active, the same way a locked object
+// refuses them, so the stashed offset always stays valid to undo.
+// ==========================================
+const EXPLODE_DISTANCE = 0.5; // meters each object is pushed outward from the van's origin
+
+let explodedEnabled = false;
+
+export function isExplodedEnabled() {
+    return explodedEnabled;
+}
+
+// The van is centered left-right and front-back on X=0/Z=0 and sits on the
+// floor at Y=0 (see van.js), so an object's own position vector *is* its
+// direction away from the van's origin — no separate "center" point needed,
+// and critically it's never pointing downward (every placed object's Y is
+// positive), so exploding never pushes something down through the floor.
+// Falls back to straight up for the (rare) object sitting exactly on the
+// origin, so it still moves instead of staying put.
+function explodeDirection(obj) {
+    const dir = obj.position.clone();
+    return dir.lengthSq() < 1e-6 ? new THREE.Vector3(0, 1, 0) : dir.normalize();
+}
+
+// Applies the outward push to a single object, unless it's parked (already
+// staged outside the van — nothing to separate it from) or already exploded.
+function explodeOne(obj) {
+    if (obj.userData.parked || obj.userData.explodeOffset) return;
+    obj.userData.explodeOffset = explodeDirection(obj).multiplyScalar(EXPLODE_DISTANCE);
+    obj.position.add(obj.userData.explodeOffset);
+}
+
+// Reverses explodeOne() for a single object; no-op if it was never exploded.
+function implodeOne(obj) {
+    if (!obj.userData.explodeOffset) return;
+    obj.position.sub(obj.userData.explodeOffset);
+    delete obj.userData.explodeOffset;
+}
+
+// Applies (or clears) the outward push across every currently tracked
+// object, mirroring setXrayEnabled() above. New objects pick up the current
+// state automatically (see addBox()/duplicateObject()/returnObjectToVan()
+// below), so toggling this once covers everything already placed and
+// anything added/loaded/undone afterward. Turning it back off re-clamps
+// every restored position to the van's *current* bounds — harmless when
+// nothing changed, but it means resizing the van while exploded (the one
+// gap the interaction guards above don't cover) can't strand an object
+// outside the walls once the view returns to normal.
+export function setExplodedEnabled(enabled) {
+    explodedEnabled = enabled;
+    objects.forEach((obj) => {
+        if (enabled) {
+            explodeOne(obj);
+        } else {
+            implodeOne(obj);
+            clampToVan(obj, obj.position);
+        }
+    });
+}
+
+// ==========================================
 // OBJECT MANAGEMENT
 // ==========================================
 function updateStats() {
@@ -180,6 +250,8 @@ export function addBox(w, h, d, colorHex, weight = DEFAULT_WEIGHT, label = null,
         placeInFirstOpenSpot(mesh, w, h, d);
     }
 
+    if (explodedEnabled) explodeOne(mesh); // new objects join the current explode view immediately, like applyXray() above
+
     scene.add(mesh);
     objects.push(mesh);
     updateStats();
@@ -228,6 +300,7 @@ export function parkObject(obj) {
     if (obj.userData.parked) return false;
 
     const { height: h } = obj.geometry.parameters;
+    delete obj.userData.explodeOffset; // parked objects sit outside the explode view entirely (see explodeOne() above), and get a fresh position below anyway
     obj.userData.parked = true;
     obj.position.copy(nextParkSlot(h));
     refreshObjectAppearance(obj);
@@ -253,6 +326,7 @@ export function returnObjectToVan(obj) {
     obj.position.set(0, vanState.maxHeight - (h / 2) - 0.1, -vanState.length / 2 + (d / 2) + 0.2);
     clampToVan(obj, obj.position);
     if (checkCollision(obj)) placeInFirstOpenSpot(obj, w, h, d);
+    if (explodedEnabled) explodeOne(obj); // rejoin the current explode view, like a freshly added object
     refreshObjectAppearance(obj);
     updateStats();
     return true;
@@ -291,9 +365,17 @@ export function duplicateObject(obj) {
     const price = obj.userData.price ?? DEFAULT_PRICE;
     const label = obj.userData.label;
 
+    // Duplicate near obj's true (non-exploded) position, not wherever it's
+    // currently displaced to for the explode view — see EXPLODE VIEW above.
+    const basePos = obj.userData.explodeOffset
+        ? obj.position.clone().sub(obj.userData.explodeOffset)
+        : obj.position;
+
     const copy = addBox(width, height, depth, color, weight, label, { price });
-    copy.position.set(obj.position.x + 0.1, obj.position.y, obj.position.z + 0.1);
+    delete copy.userData.explodeOffset; // addBox() may have just exploded the spawn position above; the .set() below replaces it outright
+    copy.position.set(basePos.x + 0.1, basePos.y, basePos.z + 0.1);
     clampToVan(copy, copy.position);
+    if (explodedEnabled) explodeOne(copy);
     return copy;
 }
 
@@ -354,7 +436,7 @@ export function clearUnlockedObjects() {
 // (X/Z) below, which are just this with the axis fixed.
 function moveAxis(obj, axis, delta, snapEnabled) {
     if (!obj) return false;
-    if (obj.userData.locked) {
+    if (obj.userData.locked || explodedEnabled) {
         flashReject(obj);
         return false;
     }
@@ -389,7 +471,7 @@ export function moveHorizontal(obj, axis, delta, snapEnabled) {
 // positive number.
 export function resizeObject(obj, w, h, d, snapEnabled) {
     if (!obj || !objects.includes(obj)) return false;
-    if (obj.userData.locked) {
+    if (obj.userData.locked || explodedEnabled) {
         flashReject(obj);
         return false;
     }
@@ -428,7 +510,7 @@ export function resizeObject(obj, w, h, d, snapEnabled) {
 // snapEnabled) — shared by rotate90() and rotateX90(), which only differ in
 // which pair of dimensions they swap.
 function rebuildGeometry(obj, snapEnabled, w, h, d) {
-    if (obj.userData.locked) {
+    if (obj.userData.locked || explodedEnabled) {
         flashReject(obj);
         return false;
     }

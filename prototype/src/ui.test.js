@@ -13,6 +13,7 @@ vi.mock('./objects.js', () => ({
     rotateX90: vi.fn(() => true),
     flashReject: vi.fn(),
     setXrayEnabled: vi.fn(),
+    setExplodedEnabled: vi.fn(),
     renameObject: vi.fn(() => true),
     parkObject: vi.fn(),
     returnObjectToVan: vi.fn(),
@@ -54,7 +55,7 @@ const { vanState, DEFAULT_VAN_STATE, objects } = await import('./state.js');
 const { buildVanGeometry } = await import('./van.js');
 const {
     addBox, clearAllObjects, clearUnlockedObjects, toggleLock, removeObject, moveVertical, resizeObject, rotate90,
-    rotateX90, flashReject, setXrayEnabled, renameObject, parkObject, returnObjectToVan,
+    rotateX90, flashReject, setXrayEnabled, setExplodedEnabled, renameObject, parkObject, returnObjectToVan,
 } = await import('./objects.js');
 const {
     saveConfig, loadConfig, hasSavedConfig, clearSavedConfig, exportToFile, sanitizeFilename,
@@ -138,6 +139,7 @@ function mountFixture() {
             <button id="cam-side"></button>
             <button id="cam-reset"></button>
             <button id="cam-xray" aria-pressed="false"></button>
+            <button id="cam-explode" aria-pressed="false"></button>
         </div>
 
         <!-- No production min/max here on purpose (beyond a generous max, to
@@ -192,6 +194,7 @@ beforeEach(() => {
     rotateX90.mockClear();
     flashReject.mockClear();
     setXrayEnabled.mockClear();
+    setExplodedEnabled.mockClear();
     renameObject.mockClear();
     renameObject.mockReturnValue(true);
     parkObject.mockClear();
@@ -1297,6 +1300,23 @@ describe('x-ray toggle', () => {
 
         btn.click();
         expect(setXrayEnabled).toHaveBeenLastCalledWith(false);
+        expect(btn.getAttribute('aria-pressed')).toBe('false');
+        expect(btn.classList.contains('text-blue-300')).toBe(false);
+    });
+});
+
+describe('explode toggle', () => {
+    it('toggles setExplodedEnabled and the button\'s pressed state on each click', () => {
+        const btn = document.getElementById('cam-explode');
+        expect(btn.getAttribute('aria-pressed')).toBe('false');
+
+        btn.click();
+        expect(setExplodedEnabled).toHaveBeenLastCalledWith(true);
+        expect(btn.getAttribute('aria-pressed')).toBe('true');
+        expect(btn.classList.contains('text-blue-300')).toBe(true);
+
+        btn.click();
+        expect(setExplodedEnabled).toHaveBeenLastCalledWith(false);
         expect(btn.getAttribute('aria-pressed')).toBe('false');
         expect(btn.classList.contains('text-blue-300')).toBe(false);
     });
