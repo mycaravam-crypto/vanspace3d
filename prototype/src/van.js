@@ -24,29 +24,24 @@ function disposeGroup(group) {
     }
 }
 
-// A real wheel arch is a rounded bump the tire housing pushes up into the
-// cargo area — not a squared-off block — so its cross-section (looking from
-// the rear, in the X/Y plane) is built as a half-ellipse: flat along the
-// floor (y=0) from one edge of the arch to the other, curving up to a
-// rounded peak of `height` at the center, then swept the full `depth` of the
-// rear section along Z (capped at both ends by ExtrudeGeometry, unlike a
-// plain half-cylinder sweep). Independent width/height radii (rather than a
-// true circle) keep it fully driven by the same narrowWidth/archHeight
-// config the old box used, so it still reshapes correctly as those sliders
-// change — no new configuration needed.
-function createWheelArchGeometry(width, height, depth) {
-    const shape = new THREE.Shape();
-    const segments = 24;
-    shape.moveTo(-width / 2, 0);
-    for (let i = 1; i < segments; i++) {
-        const t = Math.PI * (1 - i / segments); // sweeps PI -> 0, left edge to right edge
-        shape.lineTo(Math.cos(t) * (width / 2), Math.sin(t) * height);
-    }
-    shape.lineTo(width / 2, 0);
-    shape.closePath(); // back along the floor (y=0) to the start
-
-    const geo = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: segments });
-    geo.translate(0, 0, -depth / 2); // center on Z like every other geometry here (BoxGeometry is origin-centered)
+// A real wheel arch is a rounded dome the tire housing pushes up into the
+// cargo area, sized to the tire it covers — a localized bump, not a ridge
+// running the full depth of the rear section. Built as the top half of an
+// ellipsoid (THREE.SphereGeometry restricted to thetaLength=PI/2, i.e. from
+// the north pole down to the equator) so it's rounded in every direction —
+// width, height AND length — unlike a swept half-ellipse, which is only
+// rounded in cross-section and reads as a wall. The equator (its flat
+// circular/elliptical base) sits on the floor at local y=0 and is left
+// uncapped, same reasoning as every other zone mesh here: it's flush against
+// the hidden floor, so there's nothing to see there anyway.
+// `width`/`height` are the same archWidth/archHeight the old box used, so the
+// dome keeps reshaping with the narrowWidth/archHeight sliders exactly like
+// before. `length` has no equivalent slider — it's derived from `height`
+// (roughly the tire's own diameter, the realistic footprint of a wheel
+// housing) rather than stretched across the whole rear floor.
+function createWheelArchGeometry(width, height, length) {
+    const geo = new THREE.SphereGeometry(1, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+    geo.scale(width / 2, height, length / 2);
     return geo;
 }
 
@@ -122,14 +117,19 @@ export function buildVanGeometry() {
         vanGroup.add(rearFloor);
 
         // Wheel arch solid representation — a rounded dome (see
-        // createWheelArchGeometry() above), not a squared-off block. Its
-        // bounding footprint (archWidth x archHeight, spanning the same
-        // narrowWidth-to-maxWidth gap) is unchanged, so clampToVan()
-        // (collision.js) keeps treating that footprint as off-limits —
-        // conservative but safe, since the dome is always inscribed inside it.
+        // createWheelArchGeometry() above) sized like a real wheel housing,
+        // centered in the rear section rather than stretched across its
+        // whole depth. The *collision* footprint (clampToVan() in
+        // collision.js) still narrows the entire rear section to narrowWidth
+        // regardless of the dome's length — this only changes what's drawn,
+        // not what's off-limits, so the reported cargo area is unchanged.
         const archWidth = Math.max(0, (vanState.maxWidth - vanState.narrowWidth) / 2);
         if (archWidth > 0.01) {
-            const archGeo = createWheelArchGeometry(archWidth, vanState.archHeight, rearLength);
+            // Roughly the tire's own diameter — about as long as the arch is
+            // tall — capped to the rear section so it never overflows a
+            // short van.
+            const archLength = Math.min(rearLength, vanState.archHeight * 2.2);
+            const archGeo = createWheelArchGeometry(archWidth, vanState.archHeight, archLength);
             const archMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.7 });
 
             const leftArch = new THREE.Mesh(archGeo, archMat);
