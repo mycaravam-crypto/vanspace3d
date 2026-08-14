@@ -348,13 +348,13 @@ function renderStandardLibrary() {
                 <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
             </button>` : '';
         return `
-        <div class="relative group/lib-card">
+        <div class="relative group/lib-card min-w-0">
             <button class="flex flex-col items-start gap-1 w-full px-2.5 py-2 bg-white/5 border border-white/10 rounded-lg transition-colors ${accent.hoverBg} group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60" data-lib-id="${item.id}" title="${tooltip}">
-                <span class="flex items-center gap-1.5 min-w-0">
+                <span class="flex items-center gap-1.5 min-w-0 w-full">
                     <span class="w-3 h-3 rounded shrink-0 ring-1 ring-white/20" style="background:${swatchHex(item.color)}" aria-hidden="true"></span>
                     <span class="text-sm font-medium text-slate-300 truncate">${safeLabel}</span>
                 </span>
-                <span class="text-[10px] text-slate-500 font-mono truncate">${dims}</span>
+                <span class="text-[10px] text-slate-500 font-mono truncate w-full">${dims}</span>
             </button>${deleteBtn}
         </div>
     `;
