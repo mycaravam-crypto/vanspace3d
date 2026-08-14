@@ -400,6 +400,62 @@ export function returnObjectToVan(obj) {
     return true;
 }
 
+// ==========================================
+// PARK ALL — bulk toggle (sidebar button above "Alle entfernen") that parks
+// every parkable object at once via parkObject() above, so they land in the
+// same staging grid beside the van as a single-object park would. Unlike the
+// x-ray/explode toggles, this really moves objects and flips their `parked`
+// flag, so it's undo-tracked by ui.js like any other mutation — but it still
+// needs its own bookkeeping here: `parkedByParkAll` remembers exactly which
+// objects THIS toggle parked and where each one was standing, so restoring
+// puts every one of them back to its original spot instead of wherever a
+// freshly-returned object would spawn. It's null while inactive; an object
+// the user parks/unparks individually while it's active is simply left alone
+// by restoreAllParkedObjects() below (it's either not in the map, or no
+// longer parked).
+// ==========================================
+let parkedByParkAll = null;
+
+export function isParkAllActive() {
+    return !!parkedByParkAll;
+}
+
+// Parks every currently-in-van object (fixed/locked/already-parked objects
+// are left alone, same restrictions as parkObject() itself). No-op if the
+// toggle is already active.
+export function parkAllObjects() {
+    if (parkedByParkAll) return false;
+    parkedByParkAll = new Map();
+    objects
+        .filter((obj) => !obj.userData.fixed && !obj.userData.locked && !obj.userData.parked)
+        .forEach((obj) => {
+            parkedByParkAll.set(obj, obj.position.clone());
+            parkObject(obj);
+        });
+    return true;
+}
+
+// Reverses parkAllObjects(): returns every object it parked to its
+// remembered pre-park position, falling back to an open-spot scan (same as
+// returnObjectToVan()) if that spot is no longer free. No-op if the toggle
+// isn't active.
+export function restoreAllParkedObjects() {
+    if (!parkedByParkAll) return false;
+    parkedByParkAll.forEach((pos, obj) => {
+        if (!objects.includes(obj) || !obj.userData.parked) return; // removed, or already returned individually
+        const { width: w, height: h, depth: d } = obj.geometry.parameters;
+        obj.userData.parked = false;
+        obj.position.copy(pos);
+        clampToVan(obj, obj.position);
+        if (checkCollision(obj)) placeInFirstOpenSpot(obj, w, h, d);
+        if (explodedEnabled) explodeOne(obj); // rejoin the current explode view, like returnObjectToVan()
+        refreshObjectAppearance(obj);
+    });
+    parkedByParkAll = null;
+    updateStats();
+    return true;
+}
+
 // Renames a placed object's label — the only mutator here that ISN'T gated
 // on obj.userData.locked/fixed: a name is metadata, not a physical
 // attribute, so there's nothing for locking (which protects position/size/
